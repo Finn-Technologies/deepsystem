@@ -41,7 +41,7 @@ data class ChatUiState(
     val isUsingFakeEngine: Boolean = false
 )
 
-class ChatViewModel(
+class ChatViewModel @JvmOverloads constructor(
     application: Application,
     private val storage: ConversationRepository = NativeFinnStorage(),
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,

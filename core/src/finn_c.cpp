@@ -77,8 +77,13 @@ int finn_engine_generate_text(
 ) {
     if (!engine || !engine->engine || !prompt) return -1;
 
+    std::string p = prompt;
+    if (p.find("<|im_start|>") == std::string::npos) {
+        p = "<|im_start|>user\n" + p + "<|im_end|>\n<|im_start|>assistant\n";
+    }
+
     std::vector<finn::InputPart> parts;
-    parts.push_back(finn::InputPart::from_text(prompt));
+    parts.push_back(finn::InputPart::from_text(p));
 
     finn::GenerationConfig gen_cfg;
     gen_cfg.temperature = temperature;
@@ -123,7 +128,11 @@ int finn_engine_generate_multimodal(
 
     std::vector<finn::InputPart> parts;
     if (prompt && std::strlen(prompt) > 0) {
-        parts.push_back(finn::InputPart::from_text(prompt));
+        std::string p = prompt;
+        if (p.find("<|im_start|>") == std::string::npos) {
+            p = "<|im_start|>user\n" + p + "<|im_end|>\n<|im_start|>assistant\n";
+        }
+        parts.push_back(finn::InputPart::from_text(p));
     }
     if (image_bytes && image_size > 0) {
         std::vector<uint8_t> img(image_bytes, image_bytes + image_size);
