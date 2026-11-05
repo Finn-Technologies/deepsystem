@@ -302,6 +302,129 @@ class ChatViewModel @JvmOverloads constructor(
         refreshConversations()
     }
 
+    fun renameConversation(id: String, newTitle: String) {
+        val trimmed = newTitle.trim()
+        if (trimmed.isEmpty()) return
+        storage.renameConversation(id, trimmed)
+        refreshConversations()
+    }
+
+    fun deleteConversation(id: String) {
+        storage.deleteConversation(id)
+        val remaining = storage.listConversations()
+        if (remaining.isEmpty()) {
+            createNewConversation()
+        } else {
+            val nextConv = remaining.first()
+            _uiState.update {
+                it.copy(
+                    conversations = remaining,
+                    currentConversationId = nextConv.id,
+                    messages = storage.getMessages(nextConv.id),
+                    inputPrompt = ""
+                )
+            }
+        }
+    }
+
+    fun regenerateResponse() {
+        val msgs = _uiState.value.messages
+        if (msgs.isEmpty() || _uiState.value.isStreaming) return
+
+        // Find last user message
+        val lastUserIdx = msgs.indexOfLast { it.role == "user" }
+        if (lastUserIdx == -1) return
+
+        val lastUserMsg = msgs[lastUserIdx]
+        // Trim messages up to last user message
+        val trimmedMessages = msgs.take(lastUserIdx + 1)
+        _uiState.update { it.copy(messages = trimmedMessages) }
+
+        // Now trigger assistant response
+        val assistantMessageId = UUID.randomUUID().toString()
+        val initialAssistantMessage = ChatMessage(
+            id = assistantMessageId,
+            role = "assistant",
+            content = "",
+            isStreaming = true
+        )
+
+        _uiState.update {
+            it.copy(
+                messages = trimmedMessages + initialAssistantMessage,
+                isStreaming = true
+            )
+        }
+
+        val convId = _uiState.value.currentConversationId
+        val fullPrompt = buildChatMLPrompt(trimmedMessages)
+
+        activeGenerationJob = viewModelScope.launch(ioDispatcher) {
+            val responseContent = StringBuilder()
+
+            try {
+                val stats = engine.generate(
+                    prompt = fullPrompt,
+                    imageBytes = _uiState.value.selectedImageBytes,
+                    temperature = 0.7f,
+                    maxTokens = 512
+                ) { token ->
+                    responseContent.append(token)
+                    val currentText = responseContent.toString()
+
+                    _uiState.update { s ->
+                        val updated = s.messages.map { msg ->
+                            if (msg.id == assistantMessageId) {
+                                msg.copy(content = currentText)
+                            } else msg
+                        }
+                        s.copy(messages = updated)
+                    }
+                    true
+                }
+
+                val finalText = responseContent.toString().trim()
+                withContext(Dispatchers.Main) {
+                    _uiState.update { s ->
+                        val updated = s.messages.map { msg ->
+                            if (msg.id == assistantMessageId) {
+                                msg.copy(
+                                    content = finalText,
+                                    isStreaming = false,
+                                    stats = stats
+                                )
+                            } else msg
+                        }
+                        s.copy(
+                            messages = updated,
+                            isStreaming = false,
+                            latestStats = stats
+                        )
+                    }
+                }
+
+                storage.addMessage(convId, "assistant", finalText)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Regenerate error", t)
+                withContext(Dispatchers.Main) {
+                    _uiState.update { s ->
+                        val updated = s.messages.map { msg ->
+                            if (msg.id == assistantMessageId) {
+                                msg.copy(
+                                    content = responseContent.toString().ifEmpty { "Error regenerating response" },
+                                    isStreaming = false
+                                )
+                            } else msg
+                        }
+                        s.copy(messages = updated, isStreaming = false)
+                    }
+                }
+            } finally {
+                activeGenerationJob = null
+            }
+        }
+    }
+
     fun selectConversation(id: String) {
         val msgs = storage.getMessages(id)
         _uiState.update {

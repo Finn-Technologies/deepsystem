@@ -16,6 +16,7 @@ class NativeFinnStorage : ConversationRepository {
     // Fallback in-memory storage for unit tests / when native lib is absent
     private val fallbackConversations = ConcurrentHashMap<String, Conversation>()
     private val fallbackMessages = ConcurrentHashMap<String, CopyOnWriteArrayList<ChatMessage>>()
+    private val titleOverrides = ConcurrentHashMap<String, String>()
 
     init {
         if (NativeFinnBridge.isNativeLoaded()) {
@@ -44,6 +45,7 @@ class NativeFinnStorage : ConversationRepository {
     }
 
     override fun createConversation(id: String, title: String): Boolean = synchronized(lock) {
+        titleOverrides.remove(id)
         if (usingFallback || handle == 0L) {
             fallbackConversations[id] = Conversation(id, title)
             return true
@@ -52,7 +54,20 @@ class NativeFinnStorage : ConversationRepository {
         return res == 0
     }
 
+    override fun renameConversation(id: String, newTitle: String): Boolean = synchronized(lock) {
+        titleOverrides[id] = newTitle
+        if (usingFallback || handle == 0L) {
+            val existing = fallbackConversations[id]
+            if (existing != null) {
+                fallbackConversations[id] = existing.copy(title = newTitle)
+                return true
+            }
+        }
+        return true
+    }
+
     override fun deleteConversation(id: String): Boolean = synchronized(lock) {
+        titleOverrides.remove(id)
         if (usingFallback || handle == 0L) {
             fallbackConversations.remove(id)
             fallbackMessages.remove(id)
@@ -82,10 +97,12 @@ class NativeFinnStorage : ConversationRepository {
             val arr = JSONArray(json)
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
+                val id = obj.getString("id")
+                val title = titleOverrides[id] ?: obj.getString("title")
                 result.add(
                     Conversation(
-                        id = obj.getString("id"),
-                        title = obj.getString("title"),
+                        id = id,
+                        title = title,
                         updatedAt = obj.optLong("updated_at", System.currentTimeMillis())
                     )
                 )

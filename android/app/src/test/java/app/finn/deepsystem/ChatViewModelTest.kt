@@ -31,6 +31,15 @@ class FakeStorage : ConversationRepository {
         return true
     }
 
+    override fun renameConversation(id: String, newTitle: String): Boolean {
+        val existing = conversations[id]
+        if (existing != null) {
+            conversations[id] = existing.copy(title = newTitle)
+            return true
+        }
+        return false
+    }
+
     override fun deleteConversation(id: String): Boolean {
         conversations.remove(id)
         messages.remove(id)
