@@ -1,5 +1,6 @@
 *.gguf
 *.bin
+*.wav
 *.keystore
 *.jks
 local.properties
