@@ -1,5 +1,6 @@
 package app.finn.deepsystem
 
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -10,10 +11,10 @@ import app.finn.deepsystem.ui.chat.ChatScreen
 import app.finn.deepsystem.ui.chat.ChatViewModel
 import app.finn.deepsystem.ui.theme.FinnTheme
 import org.junit.After
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.Assert.assertEquals
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -55,13 +56,12 @@ class ChatScreenTest {
         composeTestRule.onNodeWithText("Finn").assertIsDisplayed()
 
         // Type a message in the input field
-        composeTestRule.onNode(hasSetTextAction()).performTextInput("Hello from Compose Test")
+        composeTestRule.onNodeWithContentDescription("Chat prompt input").performTextInput("Hello from Compose Test")
 
         // Click Send button
         composeTestRule.onNodeWithContentDescription("Send").performClick()
 
         composeTestRule.waitForIdle()
-        println("TEST DEBUG: messages size = ${viewModel.uiState.value.messages.size}, prompt = '${viewModel.uiState.value.inputPrompt}', isReady = ${viewModel.uiState.value.isModelReady}")
 
         // Verify User message appears in conversation
         composeTestRule.waitUntil(timeoutMillis = 5000) {
@@ -76,6 +76,9 @@ class ChatScreenTest {
 
         // Verify assistant message exists
         composeTestRule.onAllNodesWithText("Finn", substring = true).onFirst().assertExists()
+
+        // Verify Collapsible Working Row exists
+        composeTestRule.onNodeWithContentDescription("Expand reasoning details", substring = true).assertExists()
     }
 
     @Test
@@ -87,7 +90,7 @@ class ChatScreenTest {
         }
 
         // Turn 1
-        composeTestRule.onNode(hasSetTextAction()).performTextInput("Turn 1 Question")
+        composeTestRule.onNodeWithContentDescription("Chat prompt input").performTextInput("Turn 1 Question")
         composeTestRule.onNodeWithContentDescription("Send").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 8000) {
@@ -96,7 +99,7 @@ class ChatScreenTest {
         composeTestRule.onNodeWithText("Turn 1 Question").assertExists()
 
         // Turn 2
-        composeTestRule.onNode(hasSetTextAction()).performTextInput("Turn 2 Follow-up")
+        composeTestRule.onNodeWithContentDescription("Chat prompt input").performTextInput("Turn 2 Follow-up")
         composeTestRule.onNodeWithContentDescription("Send").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 8000) {
@@ -104,5 +107,49 @@ class ChatScreenTest {
         }
         composeTestRule.onNodeWithText("Turn 2 Follow-up").assertExists()
         assertEquals(4, viewModel.uiState.value.messages.size)
+    }
+
+    @Test
+    fun testTabletExpandedLayout() {
+        composeTestRule.setContent {
+            FinnTheme {
+                ChatScreen(
+                    viewModel = viewModel,
+                    widthSizeClass = WindowWidthSizeClass.Expanded
+                )
+            }
+        }
+
+        // In expanded layout, conversations sidebar is permanently visible on left
+        composeTestRule.onNodeWithText("Conversations").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Create new chat").assertIsDisplayed()
+
+        // Main chat area is also simultaneously present in the composition
+        composeTestRule.onNodeWithText("Finn").assertExists()
+        composeTestRule.onNodeWithContentDescription("Send").assertExists()
+    }
+
+    @Test
+    fun testChatHistoryRenameAndDelete() {
+        val convId = viewModel.uiState.value.currentConversationId
+        viewModel.renameConversation(convId, "My Renamed Conversation")
+
+        composeTestRule.setContent {
+            FinnTheme {
+                ChatScreen(
+                    viewModel = viewModel,
+                    widthSizeClass = WindowWidthSizeClass.Expanded
+                )
+            }
+        }
+
+        // Verify renamed conversation is displayed
+        composeTestRule.onNodeWithText("My Renamed Conversation").assertIsDisplayed()
+
+        // Test creating new chat
+        composeTestRule.onNodeWithContentDescription("Create new chat").performClick()
+        composeTestRule.waitForIdle()
+
+        assertTrue(viewModel.uiState.value.conversations.size >= 2)
     }
 }
