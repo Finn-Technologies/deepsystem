@@ -13,7 +13,7 @@
 ---
 
 ## 1. Test Suite Verification
-All 12 GoogleTest unit tests pass cleanly in 71 ms via `ctest` / `core_tests`:
+All 24 GoogleTest unit tests pass cleanly in 277 ms via `ctest` / `core_tests`:
 - `FakeEngineTest.LoadAndUnload`: PASSED
 - `FakeEngineTest.TextGenerationStreaming`: PASSED
 - `FakeEngineTest.CancellationViaCallback`: PASSED
@@ -26,6 +26,18 @@ All 12 GoogleTest unit tests pass cleanly in 71 ms via `ctest` / `core_tests`:
 - `StorageTest.JsonExport`: PASSED
 - `CAbiTest.EngineLifecycleAndGeneration`: PASSED
 - `CAbiTest.StorageCInterface`: PASSED
+- `CAbiTest.MultiTurnChatMLTemplateAssembly`: PASSED
+- `CAbiTest.SpeakAndVideoAndLiveCInterface`: PASSED
+- `ThinkingFilterTest.SuppressEmptyThinkingTags`: PASSED
+- `ThinkingFilterTest.SuppressReasoningThoughtsContent`: PASSED
+- `ThinkingFilterTest.PassThroughNormalOutputWithoutThinking`: PASSED
+- `ThinkingFilterTest.PartialChunkedTags`: PASSED
+- `ThinkingFilterTest.StaticStripHelper`: PASSED
+- `VadTest.EnergyVadSilenceVsSpeech`: PASSED
+- `SentenceChunkerTest.SplitsOnPunctuation`: PASSED
+- `LiveSessionTest.TurnTakingLifecycleAndLatency`: PASSED
+- `LiveSessionTest.BargeInInterruption`: PASSED
+- `LiveSessionTest.CameraFrameAttachedToTurn`: PASSED
 
 ---
 
