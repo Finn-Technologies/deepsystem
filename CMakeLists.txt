@@ -64,9 +64,11 @@ target_link_libraries(finn_core
 )
 
 # Finn CLI Host Tool
-add_executable(finn_cli tools/finn_cli/main.cpp)
-target_link_libraries(finn_cli PRIVATE finn_core)
-target_include_directories(finn_cli PRIVATE include)
+if (NOT ANDROID)
+    add_executable(finn_cli tools/finn_cli/main.cpp)
+    target_link_libraries(finn_cli PRIVATE finn_core)
+    target_include_directories(finn_cli PRIVATE include)
+endif()
 
 # Unit Testing
 include(CTest)
