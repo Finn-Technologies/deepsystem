@@ -114,6 +114,18 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // WorkManager for background model download data transfer
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Window size class for adaptive layouts
+    implementation("androidx.compose.material3:material3-window-size-class")
+
+    // CameraX for Live screen camera preview
+    implementation("androidx.camera:camera-core:1.4.0")
+    implementation("androidx.camera:camera-camera2:1.4.0")
+    implementation("androidx.camera:camera-lifecycle:1.4.0")
+    implementation("androidx.camera:camera-view:1.4.0")
+
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
