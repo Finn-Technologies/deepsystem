@@ -255,6 +255,177 @@ char* finn_storage_get_messages_json(finn_storage_t* storage, const char* conv_i
     return duplicate_string(json);
 }
 
+int finn_storage_create_note(
+    finn_storage_t* storage,
+    const char* id,
+    const char* title,
+    const char* content,
+    const char* folder,
+    const char* tags,
+    int is_pinned,
+    const char* media_path,
+    const char* media_type,
+    const char* ai_summary,
+    const char* ai_transcript
+) {
+    if (!storage || !storage->storage || !id) return -1;
+    finn::Note note;
+    note.id = id;
+    note.title = title ? title : "";
+    note.content = content ? content : "";
+    note.folder = folder ? folder : "";
+    note.tags = tags ? tags : "";
+    note.is_pinned = is_pinned != 0;
+    note.media_path = media_path ? media_path : "";
+    note.media_type = media_type ? media_type : "none";
+    note.ai_summary = ai_summary ? ai_summary : "";
+    note.ai_transcript = ai_transcript ? ai_transcript : "";
+    return storage->storage->create_note(note) ? 0 : -1;
+}
+
+int finn_storage_update_note(
+    finn_storage_t* storage,
+    const char* id,
+    const char* title,
+    const char* content,
+    const char* folder,
+    const char* tags,
+    int is_pinned,
+    const char* media_path,
+    const char* media_type,
+    const char* ai_summary,
+    const char* ai_transcript
+) {
+    if (!storage || !storage->storage || !id) return -1;
+    finn::Note note;
+    note.id = id;
+    note.title = title ? title : "";
+    note.content = content ? content : "";
+    note.folder = folder ? folder : "";
+    note.tags = tags ? tags : "";
+    note.is_pinned = is_pinned != 0;
+    note.media_path = media_path ? media_path : "";
+    note.media_type = media_type ? media_type : "none";
+    note.ai_summary = ai_summary ? ai_summary : "";
+    note.ai_transcript = ai_transcript ? ai_transcript : "";
+    return storage->storage->update_note(note) ? 0 : -1;
+}
+
+int finn_storage_delete_note(finn_storage_t* storage, const char* id) {
+    if (!storage || !storage->storage || !id) return -1;
+    return storage->storage->delete_note(id) ? 0 : -1;
+}
+
+char* finn_storage_get_note_json(finn_storage_t* storage, const char* id) {
+    if (!storage || !storage->storage || !id) return nullptr;
+    std::string json = storage->storage->export_note_json(id);
+    return duplicate_string(json);
+}
+
+char* finn_storage_list_notes_json(finn_storage_t* storage, const char* folder, const char* tag) {
+    if (!storage || !storage->storage) return nullptr;
+    std::string f = folder ? folder : "";
+    std::string t = tag ? tag : "";
+    std::string json = storage->storage->export_notes_json(f, t);
+    return duplicate_string(json);
+}
+
+char* finn_storage_search_notes_json(finn_storage_t* storage, const char* query) {
+    if (!storage || !storage->storage) return nullptr;
+    std::string q = query ? query : "";
+    std::string json = storage->storage->export_search_notes_json(q);
+    return duplicate_string(json);
+}
+
+int finn_storage_create_mini_app(
+    finn_storage_t* storage,
+    const char* id,
+    const char* title,
+    const char* description,
+    const char* html_content,
+    const char* prompt,
+    int is_pinned
+) {
+    if (!storage || !storage->storage || !id) return -1;
+    finn::MiniApp app;
+    app.id = id;
+    app.title = title ? title : "";
+    app.description = description ? description : "";
+    app.html_content = html_content ? html_content : "";
+    app.prompt = prompt ? prompt : "";
+    app.is_pinned = is_pinned != 0;
+    return storage->storage->create_mini_app(app) ? 0 : -1;
+}
+
+int finn_storage_update_mini_app(
+    finn_storage_t* storage,
+    const char* id,
+    const char* title,
+    const char* description,
+    const char* html_content,
+    const char* prompt,
+    int is_pinned
+) {
+    if (!storage || !storage->storage || !id) return -1;
+    finn::MiniApp app;
+    app.id = id;
+    app.title = title ? title : "";
+    app.description = description ? description : "";
+    app.html_content = html_content ? html_content : "";
+    app.prompt = prompt ? prompt : "";
+    app.is_pinned = is_pinned != 0;
+    return storage->storage->update_mini_app(app) ? 0 : -1;
+}
+
+int finn_storage_delete_mini_app(finn_storage_t* storage, const char* id) {
+    if (!storage || !storage->storage || !id) return -1;
+    return storage->storage->delete_mini_app(id) ? 0 : -1;
+}
+
+char* finn_storage_get_mini_app_json(finn_storage_t* storage, const char* id) {
+    if (!storage || !storage->storage || !id) return nullptr;
+    std::string json = storage->storage->export_mini_app_json(id);
+    return duplicate_string(json);
+}
+
+char* finn_storage_list_mini_apps_json(finn_storage_t* storage) {
+    if (!storage || !storage->storage) return nullptr;
+    std::string json = storage->storage->export_mini_apps_json();
+    return duplicate_string(json);
+}
+
+int finn_storage_set_mini_app_kv(
+    finn_storage_t* storage,
+    const char* app_id,
+    const char* key,
+    const char* value
+) {
+    if (!storage || !storage->storage || !app_id || !key || !value) return -1;
+    return storage->storage->set_mini_app_kv(app_id, key, value) ? 0 : -1;
+}
+
+char* finn_storage_get_mini_app_kv(
+    finn_storage_t* storage,
+    const char* app_id,
+    const char* key
+) {
+    if (!storage || !storage->storage || !app_id || !key) return nullptr;
+    std::string val;
+    if (storage->storage->get_mini_app_kv(app_id, key, &val)) {
+        return duplicate_string(val);
+    }
+    return nullptr;
+}
+
+int finn_storage_delete_mini_app_kv(
+    finn_storage_t* storage,
+    const char* app_id,
+    const char* key
+) {
+    if (!storage || !storage->storage || !app_id || !key) return -1;
+    return storage->storage->delete_mini_app_kv(app_id, key) ? 0 : -1;
+}
+
 void finn_free_string(char* s) {
     if (s) {
         std::free(s);

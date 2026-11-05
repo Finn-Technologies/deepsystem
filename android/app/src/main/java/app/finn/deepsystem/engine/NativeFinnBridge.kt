@@ -170,4 +170,88 @@ object NativeFinnBridge {
 
     @JvmStatic
     external fun nativeStorageGetMessagesJson(handle: Long, convId: String): String?
+
+    // Notes JNI declarations
+    @JvmStatic
+    external fun nativeStorageCreateNote(
+        handle: Long,
+        id: String,
+        title: String,
+        content: String,
+        folder: String,
+        tags: String,
+        isPinned: Boolean,
+        mediaPath: String,
+        mediaType: String,
+        aiSummary: String,
+        aiTranscript: String
+    ): Int
+
+    @JvmStatic
+    external fun nativeStorageUpdateNote(
+        handle: Long,
+        id: String,
+        title: String,
+        content: String,
+        folder: String,
+        tags: String,
+        isPinned: Boolean,
+        mediaPath: String,
+        mediaType: String,
+        aiSummary: String,
+        aiTranscript: String
+    ): Int
+
+    @JvmStatic
+    external fun nativeStorageDeleteNote(handle: Long, id: String): Int
+
+    @JvmStatic
+    external fun nativeStorageGetNoteJson(handle: Long, id: String): String?
+
+    @JvmStatic
+    external fun nativeStorageListNotesJson(handle: Long, folder: String?, tag: String?): String?
+
+    @JvmStatic
+    external fun nativeStorageSearchNotesJson(handle: Long, query: String?): String?
+
+    // Mini Apps JNI declarations
+    @JvmStatic
+    external fun nativeStorageCreateMiniApp(
+        handle: Long,
+        id: String,
+        title: String,
+        description: String,
+        htmlContent: String,
+        prompt: String,
+        isPinned: Boolean
+    ): Int
+
+    @JvmStatic
+    external fun nativeStorageUpdateMiniApp(
+        handle: Long,
+        id: String,
+        title: String,
+        description: String,
+        htmlContent: String,
+        prompt: String,
+        isPinned: Boolean
+    ): Int
+
+    @JvmStatic
+    external fun nativeStorageDeleteMiniApp(handle: Long, id: String): Int
+
+    @JvmStatic
+    external fun nativeStorageGetMiniAppJson(handle: Long, id: String): String?
+
+    @JvmStatic
+    external fun nativeStorageListMiniAppsJson(handle: Long): String?
+
+    @JvmStatic
+    external fun nativeStorageSetMiniAppKv(handle: Long, appId: String, key: String, value: String): Int
+
+    @JvmStatic
+    external fun nativeStorageGetMiniAppKv(handle: Long, appId: String, key: String): String?
+
+    @JvmStatic
+    external fun nativeStorageDeleteMiniAppKv(handle: Long, appId: String, key: String): Int
 }

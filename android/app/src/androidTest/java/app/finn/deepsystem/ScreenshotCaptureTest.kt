@@ -45,12 +45,19 @@ class ScreenshotCaptureTest {
 
     private fun saveScreenshot(name: String) {
         val bitmap = composeTestRule.onRoot().captureToImage().asAndroidBitmap()
-        val dir = File("/sdcard/Download")
+        val context = ApplicationProvider.getApplicationContext<FinnApplication>()
+        val dir = context.getExternalFilesDir(null) ?: context.filesDir
         if (!dir.exists()) dir.mkdirs()
         val file = File(dir, name)
         FileOutputStream(file).use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         }
+        try {
+            val pubDir = File("/sdcard/Download")
+            if (pubDir.exists() && pubDir.canWrite()) {
+                file.copyTo(File(pubDir, name), overwrite = true)
+            }
+        } catch (_: Throwable) {}
         println("Saved screenshot to ${file.absolutePath}")
     }
 

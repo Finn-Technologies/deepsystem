@@ -855,4 +855,353 @@ Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageGetMessagesJson(
     return result;
 }
 
+/* JNI Notes API */
+
+JNIEXPORT jint JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageCreateNote(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring id,
+    jstring title,
+    jstring content,
+    jstring folder,
+    jstring tags,
+    jboolean isPinned,
+    jstring mediaPath,
+    jstring mediaType,
+    jstring aiSummary,
+    jstring aiTranscript
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !id) return -1;
+
+    const char* cId = env->GetStringUTFChars(id, nullptr);
+    const char* cTitle = title ? env->GetStringUTFChars(title, nullptr) : "";
+    const char* cContent = content ? env->GetStringUTFChars(content, nullptr) : "";
+    const char* cFolder = folder ? env->GetStringUTFChars(folder, nullptr) : "";
+    const char* cTags = tags ? env->GetStringUTFChars(tags, nullptr) : "";
+    const char* cMediaPath = mediaPath ? env->GetStringUTFChars(mediaPath, nullptr) : "";
+    const char* cMediaType = mediaType ? env->GetStringUTFChars(mediaType, nullptr) : "none";
+    const char* cAiSummary = aiSummary ? env->GetStringUTFChars(aiSummary, nullptr) : "";
+    const char* cAiTranscript = aiTranscript ? env->GetStringUTFChars(aiTranscript, nullptr) : "";
+
+    int res = finn_storage_create_note(
+        storage, cId, cTitle, cContent, cFolder, cTags,
+        isPinned ? 1 : 0, cMediaPath, cMediaType, cAiSummary, cAiTranscript
+    );
+
+    env->ReleaseStringUTFChars(id, cId);
+    if (title) env->ReleaseStringUTFChars(title, cTitle);
+    if (content) env->ReleaseStringUTFChars(content, cContent);
+    if (folder) env->ReleaseStringUTFChars(folder, cFolder);
+    if (tags) env->ReleaseStringUTFChars(tags, cTags);
+    if (mediaPath) env->ReleaseStringUTFChars(mediaPath, cMediaPath);
+    if (mediaType) env->ReleaseStringUTFChars(mediaType, cMediaType);
+    if (aiSummary) env->ReleaseStringUTFChars(aiSummary, cAiSummary);
+    if (aiTranscript) env->ReleaseStringUTFChars(aiTranscript, cAiTranscript);
+
+    return res;
+}
+
+JNIEXPORT jint JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageUpdateNote(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring id,
+    jstring title,
+    jstring content,
+    jstring folder,
+    jstring tags,
+    jboolean isPinned,
+    jstring mediaPath,
+    jstring mediaType,
+    jstring aiSummary,
+    jstring aiTranscript
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !id) return -1;
+
+    const char* cId = env->GetStringUTFChars(id, nullptr);
+    const char* cTitle = title ? env->GetStringUTFChars(title, nullptr) : "";
+    const char* cContent = content ? env->GetStringUTFChars(content, nullptr) : "";
+    const char* cFolder = folder ? env->GetStringUTFChars(folder, nullptr) : "";
+    const char* cTags = tags ? env->GetStringUTFChars(tags, nullptr) : "";
+    const char* cMediaPath = mediaPath ? env->GetStringUTFChars(mediaPath, nullptr) : "";
+    const char* cMediaType = mediaType ? env->GetStringUTFChars(mediaType, nullptr) : "none";
+    const char* cAiSummary = aiSummary ? env->GetStringUTFChars(aiSummary, nullptr) : "";
+    const char* cAiTranscript = aiTranscript ? env->GetStringUTFChars(aiTranscript, nullptr) : "";
+
+    int res = finn_storage_update_note(
+        storage, cId, cTitle, cContent, cFolder, cTags,
+        isPinned ? 1 : 0, cMediaPath, cMediaType, cAiSummary, cAiTranscript
+    );
+
+    env->ReleaseStringUTFChars(id, cId);
+    if (title) env->ReleaseStringUTFChars(title, cTitle);
+    if (content) env->ReleaseStringUTFChars(content, cContent);
+    if (folder) env->ReleaseStringUTFChars(folder, cFolder);
+    if (tags) env->ReleaseStringUTFChars(tags, cTags);
+    if (mediaPath) env->ReleaseStringUTFChars(mediaPath, cMediaPath);
+    if (mediaType) env->ReleaseStringUTFChars(mediaType, cMediaType);
+    if (aiSummary) env->ReleaseStringUTFChars(aiSummary, cAiSummary);
+    if (aiTranscript) env->ReleaseStringUTFChars(aiTranscript, cAiTranscript);
+
+    return res;
+}
+
+JNIEXPORT jint JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageDeleteNote(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring id
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !id) return -1;
+    const char* cId = env->GetStringUTFChars(id, nullptr);
+    int res = finn_storage_delete_note(storage, cId);
+    env->ReleaseStringUTFChars(id, cId);
+    return res;
+}
+
+JNIEXPORT jstring JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageGetNoteJson(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring id
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !id) return nullptr;
+    const char* cId = env->GetStringUTFChars(id, nullptr);
+    char* json = finn_storage_get_note_json(storage, cId);
+    env->ReleaseStringUTFChars(id, cId);
+    if (!json) return nullptr;
+    jstring result = env->NewStringUTF(json);
+    finn_free_string(json);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageListNotesJson(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring folder,
+    jstring tag
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage) return nullptr;
+    const char* cFolder = folder ? env->GetStringUTFChars(folder, nullptr) : nullptr;
+    const char* cTag = tag ? env->GetStringUTFChars(tag, nullptr) : nullptr;
+    char* json = finn_storage_list_notes_json(storage, cFolder, cTag);
+    if (folder) env->ReleaseStringUTFChars(folder, cFolder);
+    if (tag) env->ReleaseStringUTFChars(tag, cTag);
+    if (!json) return nullptr;
+    jstring result = env->NewStringUTF(json);
+    finn_free_string(json);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageSearchNotesJson(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring query
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage) return nullptr;
+    const char* cQuery = query ? env->GetStringUTFChars(query, nullptr) : nullptr;
+    char* json = finn_storage_search_notes_json(storage, cQuery);
+    if (query) env->ReleaseStringUTFChars(query, cQuery);
+    if (!json) return nullptr;
+    jstring result = env->NewStringUTF(json);
+    finn_free_string(json);
+    return result;
+}
+
+/* JNI Mini Apps API */
+
+JNIEXPORT jint JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageCreateMiniApp(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring id,
+    jstring title,
+    jstring description,
+    jstring htmlContent,
+    jstring prompt,
+    jboolean isPinned
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !id) return -1;
+
+    const char* cId = env->GetStringUTFChars(id, nullptr);
+    const char* cTitle = title ? env->GetStringUTFChars(title, nullptr) : "";
+    const char* cDesc = description ? env->GetStringUTFChars(description, nullptr) : "";
+    const char* cHtml = htmlContent ? env->GetStringUTFChars(htmlContent, nullptr) : "";
+    const char* cPrompt = prompt ? env->GetStringUTFChars(prompt, nullptr) : "";
+
+    int res = finn_storage_create_mini_app(storage, cId, cTitle, cDesc, cHtml, cPrompt, isPinned ? 1 : 0);
+
+    env->ReleaseStringUTFChars(id, cId);
+    if (title) env->ReleaseStringUTFChars(title, cTitle);
+    if (description) env->ReleaseStringUTFChars(description, cDesc);
+    if (htmlContent) env->ReleaseStringUTFChars(htmlContent, cHtml);
+    if (prompt) env->ReleaseStringUTFChars(prompt, cPrompt);
+
+    return res;
+}
+
+JNIEXPORT jint JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageUpdateMiniApp(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring id,
+    jstring title,
+    jstring description,
+    jstring htmlContent,
+    jstring prompt,
+    jboolean isPinned
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !id) return -1;
+
+    const char* cId = env->GetStringUTFChars(id, nullptr);
+    const char* cTitle = title ? env->GetStringUTFChars(title, nullptr) : "";
+    const char* cDesc = description ? env->GetStringUTFChars(description, nullptr) : "";
+    const char* cHtml = htmlContent ? env->GetStringUTFChars(htmlContent, nullptr) : "";
+    const char* cPrompt = prompt ? env->GetStringUTFChars(prompt, nullptr) : "";
+
+    int res = finn_storage_update_mini_app(storage, cId, cTitle, cDesc, cHtml, cPrompt, isPinned ? 1 : 0);
+
+    env->ReleaseStringUTFChars(id, cId);
+    if (title) env->ReleaseStringUTFChars(title, cTitle);
+    if (description) env->ReleaseStringUTFChars(description, cDesc);
+    if (htmlContent) env->ReleaseStringUTFChars(htmlContent, cHtml);
+    if (prompt) env->ReleaseStringUTFChars(prompt, cPrompt);
+
+    return res;
+}
+
+JNIEXPORT jint JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageDeleteMiniApp(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring id
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !id) return -1;
+    const char* cId = env->GetStringUTFChars(id, nullptr);
+    int res = finn_storage_delete_mini_app(storage, cId);
+    env->ReleaseStringUTFChars(id, cId);
+    return res;
+}
+
+JNIEXPORT jstring JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageGetMiniAppJson(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring id
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !id) return nullptr;
+    const char* cId = env->GetStringUTFChars(id, nullptr);
+    char* json = finn_storage_get_mini_app_json(storage, cId);
+    env->ReleaseStringUTFChars(id, cId);
+    if (!json) return nullptr;
+    jstring result = env->NewStringUTF(json);
+    finn_free_string(json);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageListMiniAppsJson(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage) return nullptr;
+    char* json = finn_storage_list_mini_apps_json(storage);
+    if (!json) return nullptr;
+    jstring result = env->NewStringUTF(json);
+    finn_free_string(json);
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageSetMiniAppKv(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring appId,
+    jstring key,
+    jstring value
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !appId || !key || !value) return -1;
+    const char* cAppId = env->GetStringUTFChars(appId, nullptr);
+    const char* cKey = env->GetStringUTFChars(key, nullptr);
+    const char* cValue = env->GetStringUTFChars(value, nullptr);
+
+    int res = finn_storage_set_mini_app_kv(storage, cAppId, cKey, cValue);
+
+    env->ReleaseStringUTFChars(appId, cAppId);
+    env->ReleaseStringUTFChars(key, cKey);
+    env->ReleaseStringUTFChars(value, cValue);
+    return res;
+}
+
+JNIEXPORT jstring JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageGetMiniAppKv(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring appId,
+    jstring key
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !appId || !key) return nullptr;
+    const char* cAppId = env->GetStringUTFChars(appId, nullptr);
+    const char* cKey = env->GetStringUTFChars(key, nullptr);
+
+    char* val = finn_storage_get_mini_app_kv(storage, cAppId, cKey);
+
+    env->ReleaseStringUTFChars(appId, cAppId);
+    env->ReleaseStringUTFChars(key, cKey);
+
+    if (!val) return nullptr;
+    jstring result = env->NewStringUTF(val);
+    finn_free_string(val);
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_app_finn_deepsystem_engine_NativeFinnBridge_nativeStorageDeleteMiniAppKv(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jlong handle,
+    jstring appId,
+    jstring key
+) {
+    auto* storage = reinterpret_cast<finn_storage_t*>(handle);
+    if (!storage || !appId || !key) return -1;
+    const char* cAppId = env->GetStringUTFChars(appId, nullptr);
+    const char* cKey = env->GetStringUTFChars(key, nullptr);
+
+    int res = finn_storage_delete_mini_app_kv(storage, cAppId, cKey);
+
+    env->ReleaseStringUTFChars(appId, cAppId);
+    env->ReleaseStringUTFChars(key, cKey);
+    return res;
+}
+
 } // extern "C"

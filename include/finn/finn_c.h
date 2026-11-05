@@ -184,6 +184,79 @@ FINN_API int finn_storage_add_message(finn_storage_t* storage, const char* conv_
 FINN_API char* finn_storage_list_conversations_json(finn_storage_t* storage);
 FINN_API char* finn_storage_get_messages_json(finn_storage_t* storage, const char* conv_id);
 
+/* Notes API */
+FINN_API int finn_storage_create_note(
+    finn_storage_t* storage,
+    const char* id,
+    const char* title,
+    const char* content,
+    const char* folder,
+    const char* tags,
+    int is_pinned,
+    const char* media_path,
+    const char* media_type,
+    const char* ai_summary,
+    const char* ai_transcript
+);
+FINN_API int finn_storage_update_note(
+    finn_storage_t* storage,
+    const char* id,
+    const char* title,
+    const char* content,
+    const char* folder,
+    const char* tags,
+    int is_pinned,
+    const char* media_path,
+    const char* media_type,
+    const char* ai_summary,
+    const char* ai_transcript
+);
+FINN_API int finn_storage_delete_note(finn_storage_t* storage, const char* id);
+FINN_API char* finn_storage_get_note_json(finn_storage_t* storage, const char* id);
+FINN_API char* finn_storage_list_notes_json(finn_storage_t* storage, const char* folder, const char* tag);
+FINN_API char* finn_storage_search_notes_json(finn_storage_t* storage, const char* query);
+
+/* Mini Apps API */
+FINN_API int finn_storage_create_mini_app(
+    finn_storage_t* storage,
+    const char* id,
+    const char* title,
+    const char* description,
+    const char* html_content,
+    const char* prompt,
+    int is_pinned
+);
+FINN_API int finn_storage_update_mini_app(
+    finn_storage_t* storage,
+    const char* id,
+    const char* title,
+    const char* description,
+    const char* html_content,
+    const char* prompt,
+    int is_pinned
+);
+FINN_API int finn_storage_delete_mini_app(finn_storage_t* storage, const char* id);
+FINN_API char* finn_storage_get_mini_app_json(finn_storage_t* storage, const char* id);
+FINN_API char* finn_storage_list_mini_apps_json(finn_storage_t* storage);
+
+/* Mini App Scoped Storage */
+FINN_API int finn_storage_set_mini_app_kv(
+    finn_storage_t* storage,
+    const char* app_id,
+    const char* key,
+    const char* value
+);
+FINN_API char* finn_storage_get_mini_app_kv(
+    finn_storage_t* storage,
+    const char* app_id,
+    const char* key
+);
+FINN_API int finn_storage_delete_mini_app_kv(
+    finn_storage_t* storage,
+    const char* app_id,
+    const char* key
+);
+
 /* Free heap memory returned by finn API */
 FINN_API void finn_free_string(char* s);
 
