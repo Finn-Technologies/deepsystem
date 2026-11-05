@@ -207,12 +207,14 @@ class ChatViewModel @JvmOverloads constructor(
         val convId = state.currentConversationId
         storage.addMessage(convId, userMessage.role, userMessage.content)
 
+        val fullPrompt = buildChatMLPrompt(state.messages + userMessage)
+
         activeGenerationJob = viewModelScope.launch(ioDispatcher) {
             val responseContent = StringBuilder()
 
             try {
                 val stats = engine.generate(
-                    prompt = prompt.ifEmpty { "Describe this image in detail." },
+                    prompt = fullPrompt,
                     imageBytes = imageBytes,
                     temperature = 0.7f,
                     maxTokens = 512
@@ -320,6 +322,25 @@ class ChatViewModel @JvmOverloads constructor(
         super.onCleared()
         engine.cancel()
         storage.close()
+    }
+
+    fun buildChatMLPrompt(messages: List<ChatMessage>): String {
+        val sb = StringBuilder()
+        sb.append("<|im_start|>system\n")
+        sb.append("You are Finn, an intelligent, helpful, and concise on-device AI assistant. Answer questions directly without repeating the user's prompt.\n")
+        sb.append("<|im_end|>\n")
+
+        for (msg in messages) {
+            if (msg.role == "assistant" && msg.isStreaming && msg.content.isBlank()) continue
+            if (msg.content.isBlank()) continue
+
+            sb.append("<|im_start|>").append(msg.role).append("\n")
+            sb.append(msg.content.trim())
+            sb.append("<|im_end|>\n")
+        }
+
+        sb.append("<|im_start|>assistant\n")
+        return sb.toString()
     }
 
     companion object {

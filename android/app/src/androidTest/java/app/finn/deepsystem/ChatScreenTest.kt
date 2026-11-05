@@ -13,6 +13,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertEquals
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -75,5 +76,33 @@ class ChatScreenTest {
 
         // Verify assistant message exists
         composeTestRule.onAllNodesWithText("Finn", substring = true).onFirst().assertExists()
+    }
+
+    @Test
+    fun testMultiTurnConversationFlow() {
+        composeTestRule.setContent {
+            FinnTheme {
+                ChatScreen(viewModel = viewModel)
+            }
+        }
+
+        // Turn 1
+        composeTestRule.onNode(hasSetTextAction()).performTextInput("Turn 1 Question")
+        composeTestRule.onNodeWithContentDescription("Send").performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            viewModel.uiState.value.messages.size >= 2 && !viewModel.uiState.value.isStreaming
+        }
+        composeTestRule.onNodeWithText("Turn 1 Question").assertExists()
+
+        // Turn 2
+        composeTestRule.onNode(hasSetTextAction()).performTextInput("Turn 2 Follow-up")
+        composeTestRule.onNodeWithContentDescription("Send").performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            viewModel.uiState.value.messages.size >= 4 && !viewModel.uiState.value.isStreaming
+        }
+        composeTestRule.onNodeWithText("Turn 2 Follow-up").assertExists()
+        assertEquals(4, viewModel.uiState.value.messages.size)
     }
 }

@@ -158,6 +158,23 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun testBuildChatMLPromptFormatsMultiTurnProperly() {
+        val messages = listOf(
+            ChatMessage(role = "user", content = "First question"),
+            ChatMessage(role = "assistant", content = "First answer", isStreaming = false),
+            ChatMessage(role = "user", content = "Follow-up question")
+        )
+
+        val prompt = viewModel.buildChatMLPrompt(messages)
+
+        assertTrue("Must include system block", prompt.contains("<|im_start|>system\n"))
+        assertTrue("Must include first user turn", prompt.contains("<|im_start|>user\nFirst question<|im_end|>\n"))
+        assertTrue("Must include first assistant turn", prompt.contains("<|im_start|>assistant\nFirst answer<|im_end|>\n"))
+        assertTrue("Must include follow-up user turn", prompt.contains("<|im_start|>user\nFollow-up question<|im_end|>\n"))
+        assertTrue("Must end with assistant invitation", prompt.endsWith("<|im_start|>assistant\n"))
+    }
+
+    @Test
     fun testNewConversationResetsMessages() = runTest(testDispatcher) {
         viewModel.onInputPromptChanged("Message 1")
         viewModel.sendMessage()

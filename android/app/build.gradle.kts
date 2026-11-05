@@ -26,6 +26,9 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += listOf(
+                    "-DCMAKE_BUILD_TYPE=Release",
+                    "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG",
+                    "-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG",
                     "-DANDROID_STL=c++_shared",
                     "-DBUILD_SHARED_LIBS=ON",
                     "-DLLAMA_BUILD_TOOLS=OFF",
@@ -36,9 +39,12 @@ android {
                     "-DLLAMA_BUILD_MTMD=ON",
                     "-DGGML_OPENMP=OFF",
                     "-DGGML_LLAMAFILE=OFF",
+                    "-DGGML_NATIVE=OFF",
                     "-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16",
                     "-DBUILD_TESTING=OFF"
                 )
+                cppFlags += listOf("-O3", "-DNDEBUG")
+                cFlags += listOf("-O3", "-DNDEBUG")
             }
         }
 

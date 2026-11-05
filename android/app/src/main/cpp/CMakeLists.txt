@@ -4,6 +4,11 @@ project(finn_jni LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Ensure optimized Release compilation with ARM vectorization
+set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -fvectorize" CACHE STRING "" FORCE)
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -fvectorize" CACHE STRING "" FORCE)
+
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../CMakeLists.txt")
     get_filename_component(FINN_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../.." ABSOLUTE)
 elseif (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../CMakeLists.txt")

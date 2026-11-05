@@ -1,4 +1,5 @@
 #include "finn/llama_engine.h"
+#include "finn/thinking_filter.h"
 #include "llama.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
@@ -307,10 +308,13 @@ bool LlamaEngine::generate(
     } else {
         llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
     }
+    // Prevent degeneration / repetition loops
+    llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab_), 64, 1.10f, 0.0f, 0.0f));
     llama_sampler_chain_add(smpl, llama_sampler_init_dist(42));
 
     bool first_token = true;
     int completion_tokens = 0;
+    ThinkingFilter think_filter(token_cb, true);
 
     for (int i = 0; i < config.max_tokens; ++i) {
         if (is_cancelled_.load()) {
@@ -322,6 +326,20 @@ bool LlamaEngine::generate(
 
         if (llama_vocab_is_eog(vocab_, new_token)) {
             break;
+        }
+
+        if (llama_vocab_is_control(vocab_, new_token)) {
+            char piece_special[64];
+            int sp_len = llama_token_to_piece(vocab_, new_token, piece_special, sizeof(piece_special), 0, true);
+            if (sp_len > 0) {
+                std::string sp(piece_special, sp_len);
+                if (sp.find("<|im_end|>") != std::string::npos ||
+                    sp.find("<|im_start|>") != std::string::npos ||
+                    sp.find("<|endoftext|>") != std::string::npos ||
+                    sp.find("<|eot_id|>") != std::string::npos) {
+                    break;
+                }
+            }
         }
 
         if (first_token) {
@@ -336,13 +354,17 @@ bool LlamaEngine::generate(
         int n_piece = llama_token_to_piece(vocab_, new_token, piece_buf, sizeof(piece_buf), 0, false);
         if (n_piece > 0) {
             std::string piece(piece_buf, n_piece);
+
+            // Additional stop token guard
+            if (piece == "<|im_end|>" || piece == "<|im_start|>" || piece == "<|endoftext|>" || piece == "<|eot_id|>") {
+                break;
+            }
+
             completion_tokens++;
-            if (token_cb) {
-                bool cont = token_cb(piece);
-                if (!cont) {
-                    is_cancelled_ = true;
-                    break;
-                }
+            bool cont = think_filter.on_token(piece);
+            if (!cont) {
+                is_cancelled_ = true;
+                break;
             }
         }
 

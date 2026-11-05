@@ -86,6 +86,7 @@ if (BUILD_TESTING)
         core/tests/test_fake_engine.cpp
         core/tests/test_storage.cpp
         core/tests/test_c_abi.cpp
+        core/tests/test_thinking_filter.cpp
     )
     target_link_libraries(core_tests
         PRIVATE
