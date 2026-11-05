@@ -6,6 +6,7 @@
 local.properties
 .env
 build/
+build*/
 .gradle/
 .cxx/
 .idea/
