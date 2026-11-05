@@ -1,0 +1,13 @@
+*.gguf
+*.bin
+*.keystore
+*.jks
+local.properties
+.env
+build/
+.gradle/
+.cxx/
+.idea/
+.DS_Store
+models/
+third_party/llama.cpp/
