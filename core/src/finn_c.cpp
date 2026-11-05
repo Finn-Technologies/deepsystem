@@ -2,6 +2,7 @@
 #include "finn/llama_engine.h"
 #include "finn/fake_engine.h"
 #include "finn/storage.h"
+#include "finn/live_session.h"
 
 #include <cstring>
 #include <cstdlib>
@@ -257,5 +258,177 @@ char* finn_storage_get_messages_json(finn_storage_t* storage, const char* conv_i
 void finn_free_string(char* s) {
     if (s) {
         std::free(s);
+    }
+}
+
+/* Video Multimodal API */
+
+int finn_engine_generate_video(
+    finn_engine_t* engine,
+    const char* prompt,
+    const uint8_t** frame_buffers,
+    const size_t* frame_sizes,
+    size_t frame_count,
+    const uint8_t* audio_pcm,
+    size_t audio_size,
+    float temperature,
+    int32_t max_tokens,
+    finn_token_callback_fn cb,
+    void* user_data,
+    finn_engine_stats_t* stats
+) {
+    if (!engine || !engine->engine) return -1;
+
+    std::vector<finn::InputPart> parts;
+    if (frame_buffers && frame_sizes && frame_count > 0) {
+        std::vector<finn::VideoFrame> frames;
+        for (size_t i = 0; i < frame_count; ++i) {
+            if (frame_buffers[i] && frame_sizes[i] > 0) {
+                finn::VideoFrame vf;
+                vf.data.assign(frame_buffers[i], frame_buffers[i] + frame_sizes[i]);
+                vf.timestamp_ms = static_cast<int64_t>(i * 250);
+                frames.push_back(std::move(vf));
+            }
+        }
+        if (!frames.empty()) {
+            parts.push_back(finn::InputPart::from_video_frames(frames));
+        }
+    }
+
+    if (audio_pcm && audio_size > 0) {
+        std::vector<uint8_t> aud(audio_pcm, audio_pcm + audio_size);
+        parts.push_back(finn::InputPart::from_audio_pcm16k(aud));
+    }
+
+    std::string p = prompt ? prompt : "Answer questions about the video using what you see and hear.";
+    if (p.find("<|im_start|>") == std::string::npos) {
+        p = "<|im_start|>user\n" + p + "<|im_end|>\n<|im_start|>assistant\n";
+    }
+    parts.push_back(finn::InputPart::from_text(p));
+
+    finn::GenerationConfig gen_cfg;
+    gen_cfg.temperature = temperature;
+    gen_cfg.max_tokens = max_tokens > 0 ? max_tokens : 512;
+
+    finn::EngineStats finn_stats{};
+    auto callback_wrapper = [cb, user_data](const std::string& token) -> bool {
+        if (!cb) return true;
+        return cb(token.c_str(), user_data) == 0;
+    };
+
+    bool ok = engine->engine->generate(parts, gen_cfg, callback_wrapper, &finn_stats);
+
+    engine->last_stats.ttft_ms = finn_stats.ttft_ms;
+    engine->last_stats.tokens_per_second = finn_stats.tokens_per_second;
+    engine->last_stats.prompt_tokens = finn_stats.prompt_tokens;
+    engine->last_stats.completion_tokens = finn_stats.completion_tokens;
+    engine->last_stats.total_time_ms = finn_stats.total_time_ms;
+
+    if (stats) {
+        *stats = engine->last_stats;
+    }
+
+    return ok ? 0 : -1;
+}
+
+/* Live Session API */
+
+struct finn_live_session_t {
+    std::unique_ptr<finn::LiveSession> session;
+};
+
+finn_live_session_t* finn_live_create(finn_engine_t* engine, const finn_live_config_t* config) {
+    if (!engine || !engine->engine) return nullptr;
+
+    finn::LiveSessionConfig cfg;
+    if (config) {
+        if (config->vad_energy_threshold > 0.0f) cfg.vad_energy_threshold = config->vad_energy_threshold;
+        if (config->vad_silence_timeout_ms > 0) cfg.vad_silence_timeout_ms = config->vad_silence_timeout_ms;
+        if (config->voice) cfg.voice = config->voice;
+        if (config->system_prompt) cfg.system_prompt = config->system_prompt;
+    }
+
+    auto handle = new finn_live_session_t();
+    handle->session = std::make_unique<finn::LiveSession>(engine->engine.get(), cfg);
+    return handle;
+}
+
+void finn_live_destroy(finn_live_session_t* session) {
+    if (session) {
+        delete session;
+    }
+}
+
+void finn_live_start(finn_live_session_t* session) {
+    if (session && session->session) {
+        session->session->start();
+    }
+}
+
+void finn_live_stop(finn_live_session_t* session) {
+    if (session && session->session) {
+        session->session->stop();
+    }
+}
+
+void finn_live_feed_audio(finn_live_session_t* session, const int16_t* pcm, size_t count) {
+    if (session && session->session) {
+        session->session->feed_audio(pcm, count);
+    }
+}
+
+void finn_live_feed_camera_frame(finn_live_session_t* session, const uint8_t* data, size_t size) {
+    if (session && session->session) {
+        session->session->feed_camera_frame(data, size);
+    }
+}
+
+void finn_live_set_state_callback(finn_live_session_t* session, finn_live_state_cb_fn cb, void* user_data) {
+    if (session && session->session) {
+        if (cb) {
+            session->session->set_state_callback([cb, user_data](finn::LiveState old_s, finn::LiveState new_s) {
+                cb(static_cast<int32_t>(old_s), static_cast<int32_t>(new_s), user_data);
+            });
+        } else {
+            session->session->set_state_callback(nullptr);
+        }
+    }
+}
+
+void finn_live_set_audio_callback(finn_live_session_t* session, finn_audio_callback_fn cb, void* user_data) {
+    if (session && session->session) {
+        if (cb) {
+            session->session->set_audio_output_callback([cb, user_data](const int16_t* pcm, size_t count, int rate) -> bool {
+                return cb(pcm, count, rate, user_data) == 0;
+            });
+        } else {
+            session->session->set_audio_output_callback(nullptr);
+        }
+    }
+}
+
+int32_t finn_live_get_state(const finn_live_session_t* session) {
+    if (session && session->session) {
+        return static_cast<int32_t>(session->session->get_state());
+    }
+    return static_cast<int32_t>(finn::LiveState::Idle);
+}
+
+double finn_live_get_last_latency_ms(const finn_live_session_t* session) {
+    if (session && session->session) {
+        return session->session->get_last_latency_ms();
+    }
+    return 0.0;
+}
+
+void finn_live_trigger_barge_in(finn_live_session_t* session) {
+    if (session && session->session) {
+        session->session->trigger_barge_in();
+    }
+}
+
+void finn_live_trigger_end_of_speech(finn_live_session_t* session) {
+    if (session && session->session) {
+        session->session->trigger_end_of_speech();
     }
 }

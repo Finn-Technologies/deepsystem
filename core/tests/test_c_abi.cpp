@@ -131,3 +131,86 @@ TEST(CAbiTest, MultiTurnChatMLTemplateAssembly) {
     finn_engine_unload(engine);
     finn_engine_destroy(engine);
 }
+
+TEST(CAbiTest, SpeakAndVideoAndLiveCInterface) {
+    finn_engine_t* engine = finn_engine_create_fake();
+    ASSERT_NE(engine, nullptr);
+    finn_engine_config_t cfg{};
+    cfg.model_path = "mock.gguf";
+    EXPECT_EQ(finn_engine_load(engine, &cfg), 0);
+
+    // Test Speak
+    bool audio_received = false;
+    auto audio_cb = [](const int16_t* pcm, size_t count, int rate, void* user_data) -> int {
+        auto* flag = static_cast<bool*>(user_data);
+        if (pcm && count > 0) {
+            *flag = true;
+        }
+        return 0; // continue
+    };
+
+    int speak_res = finn_engine_speak(engine, "Hello from C ABI", "female", audio_cb, &audio_received);
+    EXPECT_EQ(speak_res, 0);
+    EXPECT_TRUE(audio_received);
+
+    // Test Video Generation
+    std::vector<uint8_t> frame1 = {0x01, 0x02};
+    std::vector<uint8_t> frame2 = {0x03, 0x04};
+    const uint8_t* frames[2] = {frame1.data(), frame2.data()};
+    size_t sizes[2] = {frame1.size(), frame2.size()};
+    std::vector<uint8_t> fake_audio(640, 0);
+
+    std::string vid_out;
+    int vid_res = finn_engine_generate_video(
+        engine,
+        "Describe this clip",
+        frames,
+        sizes,
+        2,
+        fake_audio.data(),
+        fake_audio.size(),
+        0.7f,
+        32,
+        [](const char* tok, void* u) {
+            auto* s = static_cast<std::string*>(u);
+            *s += tok;
+            return 0;
+        },
+        &vid_out,
+        nullptr
+    );
+    EXPECT_EQ(vid_res, 0);
+    EXPECT_FALSE(vid_out.empty());
+
+    // Test Live Session C interface
+    finn_live_config_t live_cfg{};
+    live_cfg.vad_energy_threshold = 400.0f;
+    live_cfg.vad_silence_timeout_ms = 100;
+    live_cfg.voice = "female";
+
+    finn_live_session_t* live = finn_live_create(engine, &live_cfg);
+    ASSERT_NE(live, nullptr);
+
+    EXPECT_EQ(finn_live_get_state(live), FINN_LIVE_STATE_IDLE);
+    finn_live_start(live);
+    EXPECT_EQ(finn_live_get_state(live), FINN_LIVE_STATE_LISTENING);
+
+    // Feed audio
+    std::vector<int16_t> audio_chunk(320, 100);
+    finn_live_feed_audio(live, audio_chunk.data(), audio_chunk.size());
+
+    // Trigger end of speech
+    finn_live_trigger_end_of_speech(live);
+    EXPECT_EQ(finn_live_get_state(live), FINN_LIVE_STATE_THINKING);
+
+    // Trigger barge-in
+    finn_live_trigger_barge_in(live);
+    EXPECT_EQ(finn_live_get_state(live), FINN_LIVE_STATE_LISTENING);
+
+    finn_live_stop(live);
+    EXPECT_EQ(finn_live_get_state(live), FINN_LIVE_STATE_IDLE);
+
+    finn_live_destroy(live);
+    finn_engine_unload(engine);
+    finn_engine_destroy(engine);
+}

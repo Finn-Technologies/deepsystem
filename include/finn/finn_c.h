@@ -111,6 +111,61 @@ FINN_API int finn_engine_speak(
     void* user_data
 );
 
+/* Multimodal video generation (frames + audio soundtrack + text prompt) */
+FINN_API int finn_engine_generate_video(
+    finn_engine_t* engine,
+    const char* prompt,
+    const uint8_t** frame_buffers,
+    const size_t* frame_sizes,
+    size_t frame_count,
+    const uint8_t* audio_pcm,
+    size_t audio_size,
+    float temperature,
+    int32_t max_tokens,
+    finn_token_callback_fn cb,
+    void* user_data,
+    finn_engine_stats_t* stats
+);
+
+/* ========================================================================= */
+/* Live Session API (VAD, Turn-Taking, Barge-in, Sentence-Chunked Streaming)  */
+/* ========================================================================= */
+
+typedef enum {
+    FINN_LIVE_STATE_IDLE = 0,
+    FINN_LIVE_STATE_LISTENING = 1,
+    FINN_LIVE_STATE_THINKING = 2,
+    FINN_LIVE_STATE_SPEAKING = 3
+} finn_live_state_t;
+
+typedef void (*finn_live_state_cb_fn)(int32_t old_state, int32_t new_state, void* user_data);
+
+typedef struct finn_live_session_t finn_live_session_t;
+
+typedef struct {
+    float vad_energy_threshold;
+    int32_t vad_silence_timeout_ms;
+    const char* voice;
+    const char* system_prompt;
+} finn_live_config_t;
+
+FINN_API finn_live_session_t* finn_live_create(finn_engine_t* engine, const finn_live_config_t* config);
+FINN_API void finn_live_destroy(finn_live_session_t* session);
+
+FINN_API void finn_live_start(finn_live_session_t* session);
+FINN_API void finn_live_stop(finn_live_session_t* session);
+
+FINN_API void finn_live_feed_audio(finn_live_session_t* session, const int16_t* pcm, size_t count);
+FINN_API void finn_live_feed_camera_frame(finn_live_session_t* session, const uint8_t* data, size_t size);
+
+FINN_API void finn_live_set_state_callback(finn_live_session_t* session, finn_live_state_cb_fn cb, void* user_data);
+FINN_API void finn_live_set_audio_callback(finn_live_session_t* session, finn_audio_callback_fn cb, void* user_data);
+
+FINN_API int32_t finn_live_get_state(const finn_live_session_t* session);
+FINN_API double finn_live_get_last_latency_ms(const finn_live_session_t* session);
+FINN_API void finn_live_trigger_barge_in(finn_live_session_t* session);
+FINN_API void finn_live_trigger_end_of_speech(finn_live_session_t* session);
+
 /* ========================================================================= */
 /* Storage API                                                               */
 /* ========================================================================= */

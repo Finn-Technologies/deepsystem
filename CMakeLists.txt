@@ -40,6 +40,7 @@ add_library(finn_core STATIC
     core/src/storage.cpp
     core/src/conversation.cpp
     core/src/llama_engine.cpp
+    core/src/live_session.cpp
     core/src/finn_c.cpp
 )
 
@@ -87,6 +88,7 @@ if (BUILD_TESTING)
         core/tests/test_storage.cpp
         core/tests/test_c_abi.cpp
         core/tests/test_thinking_filter.cpp
+        core/tests/test_live_session.cpp
     )
     target_link_libraries(core_tests
         PRIVATE

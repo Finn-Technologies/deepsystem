@@ -196,6 +196,21 @@ bool LlamaEngine::generate(
                 loaded_bitmaps.push_back(wrapper.bitmap);
                 has_multimodal = true;
             }
+        } else if (part.type == InputPartType::VideoFrames && mctx_ != nullptr) {
+            for (const auto& frame : part.video_frames) {
+                if (frame.data.empty()) continue;
+                auto wrapper = mtmd_helper_bitmap_init_from_buf(
+                    mctx_,
+                    frame.data.data(),
+                    frame.data.size(),
+                    false,
+                    mtmd_helper_init_opt_default()
+                );
+                if (wrapper.bitmap) {
+                    loaded_bitmaps.push_back(wrapper.bitmap);
+                    has_multimodal = true;
+                }
+            }
         }
     }
 
