@@ -24,6 +24,22 @@ interface FinnEngine {
         callback: TokenCallback
     ): EngineStats?
 
+    fun generateMultimodal(
+        prompt: String,
+        imageBytes: ByteArray? = null,
+        audioBytes: ByteArray? = null,
+        videoFrames: Array<ByteArray>? = null,
+        temperature: Float = 0.7f,
+        maxTokens: Int = 512,
+        callback: TokenCallback
+    ): EngineStats? = generate(prompt, imageBytes, temperature, maxTokens, callback)
+
+    fun speak(
+        text: String,
+        voice: String = "female",
+        callback: AudioChunkCallback? = null
+    ): Boolean = false
+
     fun cancel()
 
     fun isCancelled(): Boolean

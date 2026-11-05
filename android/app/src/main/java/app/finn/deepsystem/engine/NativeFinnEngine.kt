@@ -15,6 +15,9 @@ class NativeFinnEngine(private val isFakeEngine: Boolean = false) : FinnEngine {
         Log.i(TAG, "NativeFinnEngine created with handle=$handle (isFake=$isFakeEngine)")
     }
 
+    val nativeHandle: Long
+        get() = synchronized(lock) { handle }
+
     override val isLoaded: Boolean
         get() = synchronized(lock) {
             if (handle == 0L) false else NativeFinnBridge.nativeEngineIsLoaded(handle)
@@ -54,14 +57,36 @@ class NativeFinnEngine(private val isFakeEngine: Boolean = false) : FinnEngine {
         maxTokens: Int,
         callback: TokenCallback
     ): EngineStats? {
+        return generateMultimodal(
+            prompt = prompt,
+            imageBytes = imageBytes,
+            audioBytes = null,
+            videoFrames = null,
+            temperature = temperature,
+            maxTokens = maxTokens,
+            callback = callback
+        )
+    }
+
+    override fun generateMultimodal(
+        prompt: String,
+        imageBytes: ByteArray?,
+        audioBytes: ByteArray?,
+        videoFrames: Array<ByteArray>?,
+        temperature: Float,
+        maxTokens: Int,
+        callback: TokenCallback
+    ): EngineStats? {
         val h = synchronized(lock) { handle }
         if (h == 0L) return null
 
         val statsOut = DoubleArray(5)
-        val res = NativeFinnBridge.nativeEngineGenerate(
+        val res = NativeFinnBridge.nativeEngineGenerateMultimodal(
             h,
             prompt,
             imageBytes,
+            audioBytes,
+            videoFrames,
             temperature,
             maxTokens,
             callback,
@@ -77,7 +102,6 @@ class NativeFinnEngine(private val isFakeEngine: Boolean = false) : FinnEngine {
                 totalTimeMs = statsOut[4]
             )
         } else {
-            // Still return stats if partial generation occurred
             if (statsOut[3] > 0) {
                 EngineStats(
                     ttftMs = statsOut[0],
@@ -88,6 +112,17 @@ class NativeFinnEngine(private val isFakeEngine: Boolean = false) : FinnEngine {
                 )
             } else null
         }
+    }
+
+    override fun speak(
+        text: String,
+        voice: String,
+        callback: AudioChunkCallback?
+    ): Boolean {
+        val h = synchronized(lock) { handle }
+        if (h == 0L) return false
+        val res = NativeFinnBridge.nativeEngineSpeak(h, text, voice, callback)
+        return res == 0
     }
 
     override fun cancel() {

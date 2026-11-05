@@ -41,6 +41,9 @@ import app.finn.deepsystem.model.ChatMessage
 import app.finn.deepsystem.ui.components.*
 import app.finn.deepsystem.ui.live.FakeLiveSessionController
 import app.finn.deepsystem.ui.live.LiveScreen
+import app.finn.deepsystem.live.RealLiveSessionController
+import app.finn.deepsystem.engine.NativeFinnBridge
+import app.finn.deepsystem.engine.EngineProvider
 import app.finn.deepsystem.ui.models.ModelManagerSheet
 import app.finn.deepsystem.ui.theme.*
 import coil.compose.AsyncImage
@@ -59,8 +62,14 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Live session controller (Fake engine interface until C++ engine lands)
-    val liveController = remember { FakeLiveSessionController() }
+    // Live session controller (uses native C++ live engine when loaded, otherwise Fake)
+    val liveController = remember {
+        if (NativeFinnBridge.isNativeLoaded() && !EngineProvider.useFakeEngine) {
+            RealLiveSessionController(engineProvider = { EngineProvider.getEngine() })
+        } else {
+            FakeLiveSessionController()
+        }
+    }
     var isLiveScreenOpen by remember { mutableStateOf(false) }
 
     // Drawer state for compact phone layout
@@ -955,6 +964,9 @@ fun FloatingPillInput(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 4.dp)
+                        .semantics {
+                            contentDescription = "Chat prompt input"
+                        }
                 )
 
                 // Secondary Button: Voice Record
@@ -1016,7 +1028,7 @@ fun FloatingPillInput(
                                 )
                                 .semantics {
                                     role = Role.Button
-                                    contentDescription = "Send message"
+                                    contentDescription = "Send"
                                 }
                         ) {
                             Icon(

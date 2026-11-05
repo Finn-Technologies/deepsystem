@@ -37,6 +37,24 @@ class FakeFinnEngine(
         temperature: Float,
         maxTokens: Int,
         callback: TokenCallback
+    ): EngineStats? = generateMultimodal(
+        prompt = prompt,
+        imageBytes = imageBytes,
+        audioBytes = null,
+        videoFrames = null,
+        temperature = temperature,
+        maxTokens = maxTokens,
+        callback = callback
+    )
+
+    override fun generateMultimodal(
+        prompt: String,
+        imageBytes: ByteArray?,
+        audioBytes: ByteArray?,
+        videoFrames: Array<ByteArray>?,
+        temperature: Float,
+        maxTokens: Int,
+        callback: TokenCallback
     ): EngineStats? {
         if (!loaded.get()) return null
         cancelled.set(false)
@@ -45,6 +63,16 @@ class FakeFinnEngine(
         var ttftMs = 0.0
 
         val tokens = customTokens ?: when {
+            videoFrames != null && videoFrames.isNotEmpty() -> listOf(
+                "I", " have", " processed", " the", " video", " frames", " and", " audio", ".",
+                " The", " video", " demonstrates", " multimodal", " understanding", " in",
+                " Finn", " DeepSystem", " using", " LFM3", "-Omni", "."
+            )
+            audioBytes != null -> listOf(
+                "I", " have", " transcribed", " and", " processed", " your", " speech", " audio", ".",
+                " Speech", "-to", "-text", " and", " direct", " audio", " understanding",
+                " runs", " locally", " on", " device", "."
+            )
             imageBytes != null -> listOf(
                 "I", " see", " an", " attached", " image", "!", " It", " appears", " to", " have",
                 " clear", " visual", " features", " with", " vibrant", " colors.",
@@ -102,6 +130,25 @@ class FakeFinnEngine(
             completionTokens = completedTokens,
             totalTimeMs = totalTimeMs
         )
+    }
+
+    override fun speak(
+        text: String,
+        voice: String,
+        callback: AudioChunkCallback?
+    ): Boolean {
+        if (!loaded.get()) return false
+        cancelled.set(false)
+
+        // Generate synthetic sine audio chunks (24kHz mono PCM 16-bit, 480 samples = 20ms)
+        val sampleRate = 24000
+        val chunkSize = 480
+        val pcm = ShortArray(chunkSize) { i ->
+            (1000 * Math.sin(2.0 * Math.PI * 440.0 * i / sampleRate)).toInt().toShort()
+        }
+
+        callback?.onAudioChunk(pcm, sampleRate)
+        return true
     }
 
     override fun cancel() {
