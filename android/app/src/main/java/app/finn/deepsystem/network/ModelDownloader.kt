@@ -5,6 +5,7 @@ import android.util.Log
 import app.finn.deepsystem.model.DownloadState
 import app.finn.deepsystem.model.KnownModels
 import app.finn.deepsystem.model.ModelTarget
+import app.finn.deepsystem.background.NetworkLedger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -91,6 +92,8 @@ class ModelDownloader(private val context: Context) {
 
         val urlString = "${KnownModels.BASE_URL}/${target.relativeUrl}"
         Log.i(TAG, "Starting download for ${target.filename} from $urlString (resume from $existingBytes bytes)")
+        val ledger = NetworkLedger.getInstance(context)
+        val ledgerId = ledger.logStart(urlString, "Model weights: ${target.filename}")
 
         try {
             var currentUrl = urlString
@@ -177,6 +180,7 @@ class ModelDownloader(private val context: Context) {
                             percent = percent,
                             speedBytesPerSec = speed
                         )
+                        ledger.logProgress(ledgerId, totalDownloaded)
                         updateState(target.filename, progressState)
                         onProgress?.invoke(progressState)
 
@@ -195,6 +199,7 @@ class ModelDownloader(private val context: Context) {
             if (partFile.length() != target.expectedBytes) {
                 val msg = "Size mismatch: expected ${target.expectedBytes}, got ${partFile.length()}"
                 Log.e(TAG, msg)
+                ledger.logFailure(ledgerId, msg)
                 updateState(target.filename, DownloadState.Error(msg))
                 onProgress?.invoke(DownloadState.Error(msg))
                 return@withContext false
@@ -207,11 +212,13 @@ class ModelDownloader(private val context: Context) {
             }
 
             Log.i(TAG, "Download and verification complete for ${target.filename}")
+            ledger.logSuccess(ledgerId, totalDownloaded)
             updateState(target.filename, DownloadState.Completed)
             onProgress?.invoke(DownloadState.Completed)
             true
         } catch (t: Throwable) {
             Log.e(TAG, "Download error for ${target.filename}: ${t.message}", t)
+            ledger.logFailure(ledgerId, t.message ?: "Download failed")
             val err = DownloadState.Error(t.message ?: "Download failed")
             updateState(target.filename, err)
             onProgress?.invoke(err)
