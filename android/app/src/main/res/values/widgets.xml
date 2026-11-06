@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_quick_ask_desc">Ask Finn a question</string>
+    <string name="widget_recent_notes_desc">Your most recent notes</string>
+</resources>

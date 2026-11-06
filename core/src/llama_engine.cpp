@@ -331,6 +331,9 @@ bool LlamaEngine::generate(
     int completion_tokens = 0;
     ThinkingFilter think_filter(token_cb, true);
 
+    // Single-token decode batch reused for every step (avoids per-token malloc/free).
+    llama_batch step_batch = llama_batch_init(1, 0, 1);
+
     for (int i = 0; i < config.max_tokens; ++i) {
         if (is_cancelled_.load()) {
             break;
@@ -384,21 +387,20 @@ bool LlamaEngine::generate(
         }
 
         // Decode token to advance model state
-        llama_batch b = llama_batch_init(1, 0, 1);
-        b.token[0] = new_token;
-        b.pos[0] = n_past++;
-        b.n_seq_id[0] = 1;
-        b.seq_id[0][0] = 0;
-        b.logits[0] = true;
-        b.n_tokens = 1;
+        step_batch.token[0] = new_token;
+        step_batch.pos[0] = n_past++;
+        step_batch.n_seq_id[0] = 1;
+        step_batch.seq_id[0][0] = 0;
+        step_batch.logits[0] = true;
+        step_batch.n_tokens = 1;
 
-        int res = llama_decode(ctx_, b);
-        llama_batch_free(b);
+        int res = llama_decode(ctx_, step_batch);
         if (res != 0) {
             break;
         }
     }
 
+    llama_batch_free(step_batch);
     llama_sampler_free(smpl);
 
     auto end_time = std::chrono::steady_clock::now();

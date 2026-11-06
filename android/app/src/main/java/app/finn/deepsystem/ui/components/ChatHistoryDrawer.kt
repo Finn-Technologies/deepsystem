@@ -38,6 +38,9 @@ fun ChatHistoryContent(
     onNewChat: () -> Unit,
     onRenameConversation: (id: String, newTitle: String) -> Unit,
     onDeleteConversation: (id: String) -> Unit,
+    onOpenTasks: () -> Unit = {},
+    onOpenPrivacyLedger: () -> Unit = {},
+    onOpenAssistantCard: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -178,6 +181,27 @@ fun ChatHistoryContent(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // System Integrations & Settings Footer
+        DrawerNavigationItem(
+            icon = Icons.Default.TaskAlt,
+            title = "Background Tasks",
+            onClick = onOpenTasks
+        )
+        DrawerNavigationItem(
+            icon = Icons.Default.Security,
+            title = "Privacy & Network Ledger",
+            onClick = onOpenPrivacyLedger
+        )
+        DrawerNavigationItem(
+            icon = Icons.Default.Psychology,
+            title = "Digital Assistant Setup",
+            onClick = onOpenAssistantCard
+        )
     }
 
     // Rename Dialog
@@ -361,4 +385,45 @@ fun DeleteConversationDialog(
             }
         }
     )
+}
+
+@Composable
+fun DrawerNavigationItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = Color.Transparent,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .semantics {
+                role = Role.Button
+                contentDescription = title
+            }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
 }

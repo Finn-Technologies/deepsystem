@@ -10,7 +10,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.*
 import app.finn.deepsystem.storage.FinnPreferences
-import app.finn.deepsystem.ui.chat.ChatScreen
+import app.finn.deepsystem.home.AppShell
 import app.finn.deepsystem.ui.chat.ChatViewModel
 import app.finn.deepsystem.ui.onboarding.OnboardingScreen
 import app.finn.deepsystem.ui.theme.FinnTheme
@@ -45,13 +45,18 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    ChatScreen(
-                        viewModel = viewModel,
+                    AppShell(
+                        chatViewModel = viewModel,
                         widthSizeClass = widthSizeClass,
-                        onReplayOnboarding = { showOnboarding = true }
+                        onReplayOnboarding = { showOnboarding = true },
+                        openNoteId = intent?.getStringExtra(EXTRA_OPEN_NOTE_ID)
                     )
                 }
             }
         }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_NOTE_ID = "app.finn.deepsystem.OPEN_NOTE_ID"
     }
 }

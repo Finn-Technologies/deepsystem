@@ -41,9 +41,13 @@ import app.finn.deepsystem.model.ChatMessage
 import app.finn.deepsystem.ui.components.*
 import app.finn.deepsystem.ui.live.FakeLiveSessionController
 import app.finn.deepsystem.ui.live.LiveScreen
+import app.finn.deepsystem.ui.live.LiveSessionFactory
 import app.finn.deepsystem.live.RealLiveSessionController
 import app.finn.deepsystem.engine.NativeFinnBridge
 import app.finn.deepsystem.engine.EngineProvider
+import app.finn.deepsystem.assistant.AssistantCard
+import app.finn.deepsystem.background.TasksScreen
+import app.finn.deepsystem.background.PrivacyLedgerScreen
 import app.finn.deepsystem.ui.models.ModelManagerSheet
 import app.finn.deepsystem.ui.theme.*
 import coil.compose.AsyncImage
@@ -64,13 +68,12 @@ fun ChatScreen(
 
     // Live session controller (uses native C++ live engine when loaded, otherwise Fake)
     val liveController = remember {
-        if (NativeFinnBridge.isNativeLoaded() && !EngineProvider.useFakeEngine) {
-            RealLiveSessionController(engineProvider = { EngineProvider.getEngine() })
-        } else {
-            FakeLiveSessionController()
-        }
+        LiveSessionFactory.create(engineProvider = { EngineProvider.getEngine(context) })
     }
     var isLiveScreenOpen by remember { mutableStateOf(false) }
+    var isTasksScreenOpen by remember { mutableStateOf(false) }
+    var isPrivacyLedgerOpen by remember { mutableStateOf(false) }
+    var isAssistantDialogOpen by remember { mutableStateOf(false) }
 
     // Drawer state for compact phone layout
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -80,10 +83,30 @@ fun ChatScreen(
     var activeAttachment by remember { mutableStateOf<AttachmentItem?>(null) }
     var isVoiceRecording by remember { mutableStateOf(false) }
 
+    // Real mic capture for voice messages (16 kHz PCM -> multimodal engine)
+    fun startVoice() {
+        if (viewModel.startVoiceRecording()) {
+            isVoiceRecording = true
+        } else {
+            android.widget.Toast.makeText(context, "Microphone unavailable", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    val micPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) startVoice() }
+    val requestVoice = {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.RECORD_AUDIO
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) startVoice() else micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+    }
+
     // Auto-scroll on new messages or streaming
     LaunchedEffect(uiState.messages.size, uiState.messages.lastOrNull()?.content) {
         if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+            // Snap (no animation) while tokens stream; animating per update starves the frame budget.
+            if (uiState.isStreaming) listState.scrollToItem(uiState.messages.size - 1)
+            else listState.animateScrollToItem(uiState.messages.size - 1)
         }
     }
 
@@ -107,6 +130,16 @@ fun ChatScreen(
             controller = liveController,
             onClose = { isLiveScreenOpen = false }
         )
+        return
+    }
+
+    if (isTasksScreenOpen) {
+        TasksScreen(onClose = { isTasksScreenOpen = false })
+        return
+    }
+
+    if (isPrivacyLedgerOpen) {
+        PrivacyLedgerScreen(onClose = { isPrivacyLedgerOpen = false })
         return
     }
 
@@ -137,7 +170,10 @@ fun ChatScreen(
                     },
                     onDeleteConversation = { id ->
                         viewModel.deleteConversation(id)
-                    }
+                    },
+                    onOpenTasks = { isTasksScreenOpen = true },
+                    onOpenPrivacyLedger = { isPrivacyLedgerOpen = true },
+                    onOpenAssistantCard = { isAssistantDialogOpen = true }
                 )
             }
 
@@ -163,22 +199,27 @@ fun ChatScreen(
                     activeAttachment = activeAttachment,
                     onSelectAttachment = { att ->
                         activeAttachment = att
-                        if (att.type == AttachmentType.IMAGE) {
-                            viewModel.onImageSelected(att.uri, att.bytes)
+                        when (att.type) {
+                            AttachmentType.IMAGE -> viewModel.onImageSelected(att.uri, att.bytes)
+                            AttachmentType.AUDIO -> viewModel.onAudioSelected(android.net.Uri.parse(att.uri))
+                            AttachmentType.VIDEO -> viewModel.onVideoSelected(android.net.Uri.parse(att.uri))
+                            else -> {}
                         }
                     },
                     onRemoveAttachment = {
                         activeAttachment = null
-                        viewModel.removeImage()
+                        viewModel.clearAttachments()
                     },
                     isVoiceRecording = isVoiceRecording,
-                    onStartVoiceRecording = { isVoiceRecording = true },
-                    onStopVoiceRecording = { text ->
+                    onStartVoiceRecording = requestVoice,
+                    onStopVoiceRecording = { _ ->
                         isVoiceRecording = false
-                        viewModel.onInputPromptChanged(text)
-                        viewModel.sendMessage()
+                        viewModel.stopVoiceRecordingAndSend()
                     },
-                    onCancelVoiceRecording = { isVoiceRecording = false }
+                    onCancelVoiceRecording = {
+                        isVoiceRecording = false
+                        viewModel.cancelVoiceRecording()
+                    }
                 )
             }
         }
@@ -206,7 +247,10 @@ fun ChatScreen(
                         },
                         onDeleteConversation = { id ->
                             viewModel.deleteConversation(id)
-                        }
+                        },
+                        onOpenTasks = { isTasksScreenOpen = true; coroutineScope.launch { drawerState.close() } },
+                        onOpenPrivacyLedger = { isPrivacyLedgerOpen = true; coroutineScope.launch { drawerState.close() } },
+                        onOpenAssistantCard = { isAssistantDialogOpen = true; coroutineScope.launch { drawerState.close() } }
                     )
                 }
             }
@@ -230,22 +274,27 @@ fun ChatScreen(
                     activeAttachment = activeAttachment,
                     onSelectAttachment = { att ->
                         activeAttachment = att
-                        if (att.type == AttachmentType.IMAGE) {
-                            viewModel.onImageSelected(att.uri, att.bytes)
+                        when (att.type) {
+                            AttachmentType.IMAGE -> viewModel.onImageSelected(att.uri, att.bytes)
+                            AttachmentType.AUDIO -> viewModel.onAudioSelected(android.net.Uri.parse(att.uri))
+                            AttachmentType.VIDEO -> viewModel.onVideoSelected(android.net.Uri.parse(att.uri))
+                            else -> {}
                         }
                     },
                     onRemoveAttachment = {
                         activeAttachment = null
-                        viewModel.removeImage()
+                        viewModel.clearAttachments()
                     },
                     isVoiceRecording = isVoiceRecording,
-                    onStartVoiceRecording = { isVoiceRecording = true },
-                    onStopVoiceRecording = { text ->
+                    onStartVoiceRecording = requestVoice,
+                    onStopVoiceRecording = { _ ->
                         isVoiceRecording = false
-                        viewModel.onInputPromptChanged(text)
-                        viewModel.sendMessage()
+                        viewModel.stopVoiceRecordingAndSend()
                     },
-                    onCancelVoiceRecording = { isVoiceRecording = false }
+                    onCancelVoiceRecording = {
+                        isVoiceRecording = false
+                        viewModel.cancelVoiceRecording()
+                    }
                 )
             }
         }
@@ -257,6 +306,12 @@ fun ChatScreen(
             viewModel = viewModel,
             onDismiss = { viewModel.closeModelManager() }
         )
+    }
+
+    if (isAssistantDialogOpen) {
+        AlertDialog(onDismissRequest = { isAssistantDialogOpen = false }) {
+            AssistantCard(onRoleChanged = {})
+        }
     }
 }
 
@@ -325,6 +380,8 @@ fun ChatMainCanvas(
             ) { message ->
                 ChatMessageRow(
                     message = message,
+                    isSpeaking = uiState.speakingMessageId == message.id,
+                    onSpeak = { viewModel.speakReply(message) },
                     onRegenerate = { viewModel.regenerateResponse() }
                 )
             }
@@ -660,7 +717,9 @@ fun EmptyStatePrompt(
 @Composable
 fun ChatMessageRow(
     message: ChatMessage,
-    onRegenerate: () -> Unit
+    onRegenerate: () -> Unit,
+    isSpeaking: Boolean = false,
+    onSpeak: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -817,6 +876,23 @@ fun ChatMessageRow(
                     modifier = Modifier.padding(top = 8.dp, start = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    IconButton(
+                        onClick = onSpeak,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .semantics {
+                                role = Role.Button
+                                contentDescription = if (isSpeaking) "Stop speaking" else "Speak reply"
+                            }
+                    ) {
+                        Icon(
+                            if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isSpeaking) FinnIndigo else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+
                     IconButton(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

@@ -45,6 +45,7 @@ import app.finn.deepsystem.model.DownloadState
 import app.finn.deepsystem.model.KnownModels
 import app.finn.deepsystem.model.ModelTarget
 import app.finn.deepsystem.network.ModelDownloadWorker
+import app.finn.deepsystem.assistant.AssistantCard
 import app.finn.deepsystem.storage.FinnPreferences
 import app.finn.deepsystem.ui.chat.ChatViewModel
 import app.finn.deepsystem.ui.theme.*
@@ -607,6 +608,11 @@ fun PermissionsStep(
                 }
             }
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Digital Assistant Integration Card
+        AssistantCard()
     }
 }
 

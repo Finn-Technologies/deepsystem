@@ -39,12 +39,30 @@ import app.finn.deepsystem.ui.theme.FinnIndigo
 @Composable
 fun LiveCameraPip(
     modifier: Modifier = Modifier,
+    onFrame: ((ByteArray) -> Unit)? = null,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
     var cameraAvailable by remember { mutableStateOf(true) }
+
+    // Simulated frame generator when running in headless/mock environment
+    LaunchedEffect(cameraAvailable, onFrame) {
+        if (!cameraAvailable && onFrame != null) {
+            while (true) {
+                kotlinx.coroutines.delay(1000)
+                try {
+                    val simBitmap = android.graphics.Bitmap.createBitmap(160, 160, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(simBitmap)
+                    canvas.drawColor(android.graphics.Color.DKGRAY)
+                    val out = java.io.ByteArrayOutputStream()
+                    simBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, out)
+                    onFrame(out.toByteArray())
+                } catch (_: Throwable) {}
+            }
+        }
+    }
 
     Box(
         modifier = modifier
@@ -67,8 +85,27 @@ fun LiveCameraPip(
                             val cameraSelector = CameraSelector.Builder()
                                 .requireLensFacing(lensFacing)
                                 .build()
+
+                            val analysis = androidx.camera.core.ImageAnalysis.Builder()
+                                .setBackpressureStrategy(androidx.camera.core.ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build()
+
+                            analysis.setAnalyzer(ContextCompat.getMainExecutor(ctx)) { imageProxy ->
+                                try {
+                                    if (onFrame != null) {
+                                        val bmp = imageProxy.toBitmap()
+                                        val out = java.io.ByteArrayOutputStream()
+                                        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, out)
+                                        onFrame(out.toByteArray())
+                                    }
+                                } catch (_: Throwable) {
+                                } finally {
+                                    imageProxy.close()
+                                }
+                            }
+
                             cameraProvider.unbindAll()
-                            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
+                            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, analysis)
                         } catch (e: Exception) {
                             Log.w("LiveCameraPip", "CameraX bind failed, using simulated preview: ${e.message}")
                             cameraAvailable = false

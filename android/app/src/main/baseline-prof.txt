@@ -1,0 +1,21 @@
+# Baseline profile (hand-authored rules): chat streaming + markdown + live hot paths.
+HSPLapp/finn/deepsystem/ui/chat/ChatViewModel;->*(**)**
+HSPLapp/finn/deepsystem/ui/chat/ChatViewModel$*;->*(**)**
+HSPLapp/finn/deepsystem/ui/chat/ChatScreenKt;->*(**)**
+HSPLapp/finn/deepsystem/ui/chat/ChatScreenKt$*;->*(**)**
+HSPLapp/finn/deepsystem/ui/components/MarkdownRendererKt;->*(**)**
+HSPLapp/finn/deepsystem/ui/components/MarkdownRendererKt$*;->*(**)**
+HSPLapp/finn/deepsystem/ui/components/MarkdownBlock*;->*(**)**
+HSPLapp/finn/deepsystem/ui/components/CollapsibleWorkingRowKt;->*(**)**
+HSPLapp/finn/deepsystem/ui/live/LiveScreenKt;->*(**)**
+HSPLapp/finn/deepsystem/ui/live/LiveScreenKt$*;->*(**)**
+HSPLapp/finn/deepsystem/engine/NativeFinnEngine;->*(**)**
+HSPLapp/finn/deepsystem/engine/NativeFinnBridge;->*(**)**
+HSPLapp/finn/deepsystem/live/NativeLiveSession;->*(**)**
+HSPLapp/finn/deepsystem/live/RealLiveSessionController;->*(**)**
+HSPLapp/finn/deepsystem/audio/AudioRecorder;->*(**)**
+HSPLapp/finn/deepsystem/audio/AudioTrackPlayer;->*(**)**
+Lapp/finn/deepsystem/ui/chat/ChatViewModel;
+Lapp/finn/deepsystem/ui/components/MarkdownBlock;
+Lapp/finn/deepsystem/ui/chat/ChatScreenKt;
+Lapp/finn/deepsystem/ui/components/MarkdownRendererKt;

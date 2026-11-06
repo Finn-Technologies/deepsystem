@@ -228,6 +228,7 @@ fun LiveScreen(
         // Camera Preview Floating Picture-in-Picture
         if (isCameraEnabled) {
             LiveCameraPip(
+                onFrame = { frameBytes -> controller.onCameraFrame(frameBytes) },
                 onClose = { controller.toggleCamera() },
                 modifier = Modifier
                     .align(Alignment.TopEnd)

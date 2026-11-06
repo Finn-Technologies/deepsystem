@@ -88,6 +88,33 @@
             </intent-filter>
         </activity>
 
+        <!-- Share to Finn: save shared text/image/audio/video as a note -->
+        <activity
+            android:name=".notes.ShareReceiverActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:label="Save to Finn Notes">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Glance home screen widgets -->
+        <receiver android:name=".widgets.QuickAskWidgetReceiver" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/quick_ask_widget_info" />
+        </receiver>
+        <receiver android:name=".widgets.RecentNotesWidgetReceiver" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/recent_notes_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

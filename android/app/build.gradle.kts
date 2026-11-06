@@ -6,6 +6,9 @@ plugins {
 
 android {
     namespace = "app.finn.deepsystem"
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
     compileSdk = 35
 
     ndkVersion = "27.2.12479018"
@@ -128,6 +131,10 @@ dependencies {
 
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Glance AppWidgets
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

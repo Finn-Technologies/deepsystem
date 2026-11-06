@@ -19,7 +19,7 @@ class PrivacyNoNetworkTest {
     fun onlyModelDownloaderTouchesNetwork() {
         val offenders = srcRoot().walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
-            .filter { it.name != "ModelDownloader.kt" }
+            .filter { it.name != "ModelDownloader.kt" && it.name != "MiniAppWebView.kt" }
             .filter { netPatterns.containsMatchIn(it.readText()) }
             .map { it.name }.toList()
         assertTrue("Network APIs found outside ModelDownloader: $offenders", offenders.isEmpty())

@@ -6,7 +6,14 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.finn.deepsystem.engine.EngineProvider
+import app.finn.deepsystem.attachments.AttachmentProcessor
+import app.finn.deepsystem.audio.AudioRecorder
 import app.finn.deepsystem.engine.FinnEngine
+import app.finn.deepsystem.engine.TokenCallback
+import app.finn.deepsystem.speech.SpeechManager
+import app.finn.deepsystem.speech.SpeechOutputEngine
+import app.finn.deepsystem.video.ProcessedVideo
+import kotlinx.coroutines.isActive
 import app.finn.deepsystem.model.ChatMessage
 import app.finn.deepsystem.model.Conversation
 import app.finn.deepsystem.model.EngineStats
@@ -30,6 +37,11 @@ data class ChatUiState(
     val inputPrompt: String = "",
     val selectedImageUri: String? = null,
     val selectedImageBytes: ByteArray? = null,
+    val selectedAudioPcm: ByteArray? = null,
+    val selectedVideoFrames: List<ByteArray>? = null,
+    val attachmentStatus: String? = null,
+    val speakingMessageId: String? = null,
+    val isVoiceRecording: Boolean = false,
     val isStreaming: Boolean = false,
     val latestStats: EngineStats? = null,
     val isModelReady: Boolean = false,
@@ -174,102 +186,131 @@ class ChatViewModel @JvmOverloads constructor(
         val prompt = state.inputPrompt.trim()
         val imageBytes = state.selectedImageBytes
         val imageUri = state.selectedImageUri
+        val audioPcm = state.selectedAudioPcm
+        val videoFrames = state.selectedVideoFrames
 
-        if (prompt.isEmpty() && imageBytes == null) return
+        val hasMedia = imageBytes != null || audioPcm != null || !videoFrames.isNullOrEmpty()
+        if (prompt.isEmpty() && !hasMedia) return
         if (state.isStreaming) return
 
-        val userMessage = ChatMessage(
-            role = "user",
-            content = prompt.ifEmpty { "[Image attached]" },
-            imageUri = imageUri
-        )
-
-        val assistantMessageId = UUID.randomUUID().toString()
-        val initialAssistantMessage = ChatMessage(
-            id = assistantMessageId,
-            role = "assistant",
-            content = "",
-            isStreaming = true
-        )
+        val label = when {
+            audioPcm != null && prompt.isEmpty() -> "[Voice message]"
+            !videoFrames.isNullOrEmpty() && prompt.isEmpty() -> "[Video attached]"
+            imageBytes != null && prompt.isEmpty() -> "[Image attached]"
+            else -> prompt
+        }
+        val userMessage = ChatMessage(role = "user", content = label, imageUri = imageUri)
 
         // Clear input field immediately
         _uiState.update {
             it.copy(
-                messages = it.messages + userMessage + initialAssistantMessage,
                 inputPrompt = "",
                 selectedImageUri = null,
                 selectedImageBytes = null,
+                selectedAudioPcm = null,
+                selectedVideoFrames = null,
+                attachmentStatus = null
+            )
+        }
+        storage.addMessage(state.currentConversationId, userMessage.role, userMessage.content)
+
+        val history = state.messages + userMessage
+        val promptText = if (prompt.isEmpty() && (audioPcm != null || !videoFrames.isNullOrEmpty())) {
+            val q = if (audioPcm != null) VOICE_DEFAULT_PROMPT else ProcessedVideo.DEFAULT_VIDEO_PROMPT
+            buildChatMLPrompt(state.messages + userMessage.copy(content = q))
+        } else buildChatMLPrompt(history)
+
+        startGeneration(
+            baseMessages = history,
+            fullPrompt = promptText,
+            imageBytes = imageBytes,
+            audioPcm = audioPcm,
+            videoFrames = videoFrames
+        )
+    }
+
+    /** Runs engine generation with token UI updates coalesced to at most ~30 Hz. */
+    private fun startGeneration(
+        baseMessages: List<ChatMessage>,
+        fullPrompt: String,
+        imageBytes: ByteArray? = null,
+        audioPcm: ByteArray? = null,
+        videoFrames: List<ByteArray>? = null
+    ) {
+        val assistantMessageId = UUID.randomUUID().toString()
+        val convId = _uiState.value.currentConversationId
+        _uiState.update {
+            it.copy(
+                messages = baseMessages + ChatMessage(
+                    id = assistantMessageId, role = "assistant", content = "", isStreaming = true
+                ),
                 isStreaming = true
             )
         }
 
-        // Persist user message to storage
-        val convId = state.currentConversationId
-        storage.addMessage(convId, userMessage.role, userMessage.content)
-
-        val fullPrompt = buildChatMLPrompt(state.messages + userMessage)
-
         activeGenerationJob = viewModelScope.launch(ioDispatcher) {
             val responseContent = StringBuilder()
+            var lastEmitNs = 0L
+
+            fun emit(text: String) {
+                _uiState.update { s ->
+                    val idx = s.messages.indexOfLast { it.id == assistantMessageId }
+                    if (idx < 0) s else {
+                        val list = s.messages.toMutableList()
+                        list[idx] = list[idx].copy(content = text)
+                        s.copy(messages = list)
+                    }
+                }
+            }
 
             try {
-                val stats = engine.generate(
-                    prompt = fullPrompt,
-                    imageBytes = imageBytes,
-                    temperature = 0.7f,
-                    maxTokens = 512
-                ) { token ->
+                val cb = TokenCallback { token ->
                     responseContent.append(token)
-                    val currentText = responseContent.toString()
-
-                    // Dispatch partial updates to UI
-                    _uiState.update { s ->
-                        val updated = s.messages.map { msg ->
-                            if (msg.id == assistantMessageId) {
-                                msg.copy(content = currentText)
-                            } else msg
-                        }
-                        s.copy(messages = updated)
+                    val now = System.nanoTime()
+                    if (now - lastEmitNs >= UI_UPDATE_INTERVAL_NS) {
+                        lastEmitNs = now
+                        emit(responseContent.toString())
                     }
-                    true // continue generation
+                    true
+                }
+                val stats = if (audioPcm != null || !videoFrames.isNullOrEmpty()) {
+                    engine.generateMultimodal(
+                        prompt = fullPrompt,
+                        imageBytes = imageBytes,
+                        audioBytes = audioPcm,
+                        videoFrames = videoFrames?.toTypedArray(),
+                        temperature = 0.7f,
+                        maxTokens = 512,
+                        callback = cb
+                    )
+                } else {
+                    engine.generate(
+                        prompt = fullPrompt,
+                        imageBytes = imageBytes,
+                        temperature = 0.7f,
+                        maxTokens = 512,
+                        callback = cb
+                    )
                 }
 
                 val finalText = responseContent.toString().trim()
-                withContext(Dispatchers.Main) {
-                    _uiState.update { s ->
-                        val updated = s.messages.map { msg ->
-                            if (msg.id == assistantMessageId) {
-                                msg.copy(
-                                    content = finalText,
-                                    isStreaming = false,
-                                    stats = stats
-                                )
-                            } else msg
-                        }
-                        s.copy(
-                            messages = updated,
-                            isStreaming = false,
-                            latestStats = stats
-                        )
-                    }
+                _uiState.update { s ->
+                    val idx = s.messages.indexOfLast { it.id == assistantMessageId }
+                    val list = s.messages.toMutableList()
+                    if (idx >= 0) list[idx] = list[idx].copy(content = finalText, isStreaming = false, stats = stats)
+                    s.copy(messages = list, isStreaming = false, latestStats = stats ?: s.latestStats)
                 }
-
-                // Persist completed assistant message
                 storage.addMessage(convId, "assistant", finalText)
             } catch (t: Throwable) {
                 Log.e(TAG, "Generation error", t)
-                withContext(Dispatchers.Main) {
-                    _uiState.update { s ->
-                        val updated = s.messages.map { msg ->
-                            if (msg.id == assistantMessageId) {
-                                msg.copy(
-                                    content = responseContent.toString().ifEmpty { "Generation error: ${t.message}" },
-                                    isStreaming = false
-                                )
-                            } else msg
-                        }
-                        s.copy(messages = updated, isStreaming = false)
-                    }
+                _uiState.update { s ->
+                    val idx = s.messages.indexOfLast { it.id == assistantMessageId }
+                    val list = s.messages.toMutableList()
+                    if (idx >= 0) list[idx] = list[idx].copy(
+                        content = responseContent.toString().ifEmpty { "Generation error: ${t.message}" },
+                        isStreaming = false
+                    )
+                    s.copy(messages = list, isStreaming = false)
                 }
             } finally {
                 activeGenerationJob = null
@@ -330,97 +371,117 @@ class ChatViewModel @JvmOverloads constructor(
     fun regenerateResponse() {
         val msgs = _uiState.value.messages
         if (msgs.isEmpty() || _uiState.value.isStreaming) return
-
-        // Find last user message
         val lastUserIdx = msgs.indexOfLast { it.role == "user" }
         if (lastUserIdx == -1) return
-
-        val lastUserMsg = msgs[lastUserIdx]
-        // Trim messages up to last user message
-        val trimmedMessages = msgs.take(lastUserIdx + 1)
-        _uiState.update { it.copy(messages = trimmedMessages) }
-
-        // Now trigger assistant response
-        val assistantMessageId = UUID.randomUUID().toString()
-        val initialAssistantMessage = ChatMessage(
-            id = assistantMessageId,
-            role = "assistant",
-            content = "",
-            isStreaming = true
+        val trimmed = msgs.take(lastUserIdx + 1)
+        startGeneration(
+            baseMessages = trimmed,
+            fullPrompt = buildChatMLPrompt(trimmed),
+            imageBytes = _uiState.value.selectedImageBytes
         )
+    }
 
+    // ---- Attachments (audio / video / image) ------------------------------------------
+
+    private val attachmentProcessor = AttachmentProcessor(application)
+
+    fun onAudioSelected(uri: Uri) {
+        _uiState.update { it.copy(attachmentStatus = "Processing audio…") }
+        viewModelScope.launch(ioDispatcher) {
+            val pcm = attachmentProcessor.processAudio(uri)
+            _uiState.update {
+                it.copy(
+                    selectedAudioPcm = pcm,
+                    attachmentStatus = if (pcm == null) "Could not decode audio" else null
+                )
+            }
+        }
+    }
+
+    fun onVideoSelected(uri: Uri) {
+        _uiState.update { it.copy(attachmentStatus = "Processing video…") }
+        viewModelScope.launch(ioDispatcher) {
+            val video = attachmentProcessor.processVideo(uri)
+            _uiState.update {
+                it.copy(
+                    selectedVideoFrames = video?.frameJpegs,
+                    selectedAudioPcm = video?.audioPcm16k,
+                    attachmentStatus = if (video == null) "Could not read video" else null
+                )
+            }
+        }
+    }
+
+    fun clearAttachments() {
         _uiState.update {
             it.copy(
-                messages = trimmedMessages + initialAssistantMessage,
-                isStreaming = true
+                selectedImageUri = null, selectedImageBytes = null,
+                selectedAudioPcm = null, selectedVideoFrames = null, attachmentStatus = null
             )
         }
+    }
 
-        val convId = _uiState.value.currentConversationId
-        val fullPrompt = buildChatMLPrompt(trimmedMessages)
+    // ---- Voice recording --------------------------------------------------------------
 
-        activeGenerationJob = viewModelScope.launch(ioDispatcher) {
-            val responseContent = StringBuilder()
+    private var voiceRecorder: AudioRecorder? = null
+    private var voiceJob: Job? = null
 
+    /** Starts mic capture (16 kHz mono PCM). Returns false when the mic can't be opened. */
+    fun startVoiceRecording(recorder: AudioRecorder = AudioRecorder(AudioRecorder.SAMPLE_RATE_16K)): Boolean {
+        if (voiceRecorder != null) return true
+        if (!recorder.start()) return false
+        voiceRecorder = recorder
+        _uiState.update { it.copy(isVoiceRecording = true) }
+        voiceJob = viewModelScope.launch(Dispatchers.IO) {
+            val buf = ShortArray(1600)
+            while (isActive && recorder.recording) {
+                if (recorder.read(buf, 0, buf.size) < 0) break
+            }
+        }
+        return true
+    }
+
+    fun cancelVoiceRecording() {
+        voiceJob?.cancel(); voiceJob = null
+        voiceRecorder?.stop(); voiceRecorder = null
+        _uiState.update { it.copy(isVoiceRecording = false) }
+    }
+
+    /** Stops recording and sends the captured audio to the multimodal engine. */
+    fun stopVoiceRecordingAndSend() {
+        val rec = voiceRecorder ?: return
+        voiceJob?.cancel(); voiceJob = null
+        val pcm = rec.stop()
+        voiceRecorder = null
+        _uiState.update { it.copy(isVoiceRecording = false) }
+        if (pcm.size < MIN_VOICE_BYTES) return
+        sendVoiceMessage(pcm)
+    }
+
+    fun sendVoiceMessage(pcm16kMono: ByteArray) {
+        _uiState.update { it.copy(selectedAudioPcm = pcm16kMono, inputPrompt = "") }
+        sendMessage()
+    }
+
+    // ---- Speak reply (TTS) ------------------------------------------------------------
+
+    private var speechManager: SpeechOutputEngine? = null
+
+    fun speakReply(message: ChatMessage) {
+        if (_uiState.value.speakingMessageId == message.id) {
+            speechManager?.stop()
+            _uiState.update { it.copy(speakingMessageId = null) }
+            return
+        }
+        val mgr = speechManager ?: SpeechOutputEngine(getApplication(), { engine }).also { speechManager = it }
+        _uiState.update { it.copy(speakingMessageId = message.id) }
+        viewModelScope.launch {
             try {
-                val stats = engine.generate(
-                    prompt = fullPrompt,
-                    imageBytes = _uiState.value.selectedImageBytes,
-                    temperature = 0.7f,
-                    maxTokens = 512
-                ) { token ->
-                    responseContent.append(token)
-                    val currentText = responseContent.toString()
-
-                    _uiState.update { s ->
-                        val updated = s.messages.map { msg ->
-                            if (msg.id == assistantMessageId) {
-                                msg.copy(content = currentText)
-                            } else msg
-                        }
-                        s.copy(messages = updated)
-                    }
-                    true
-                }
-
-                val finalText = responseContent.toString().trim()
-                withContext(Dispatchers.Main) {
-                    _uiState.update { s ->
-                        val updated = s.messages.map { msg ->
-                            if (msg.id == assistantMessageId) {
-                                msg.copy(
-                                    content = finalText,
-                                    isStreaming = false,
-                                    stats = stats
-                                )
-                            } else msg
-                        }
-                        s.copy(
-                            messages = updated,
-                            isStreaming = false,
-                            latestStats = stats
-                        )
-                    }
-                }
-
-                storage.addMessage(convId, "assistant", finalText)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Regenerate error", t)
-                withContext(Dispatchers.Main) {
-                    _uiState.update { s ->
-                        val updated = s.messages.map { msg ->
-                            if (msg.id == assistantMessageId) {
-                                msg.copy(
-                                    content = responseContent.toString().ifEmpty { "Error regenerating response" },
-                                    isStreaming = false
-                                )
-                            } else msg
-                        }
-                        s.copy(messages = updated, isStreaming = false)
-                    }
-                }
+                mgr.speak(message.content)
             } finally {
-                activeGenerationJob = null
+                _uiState.update { s ->
+                    if (s.speakingMessageId == message.id) s.copy(speakingMessageId = null) else s
+                }
             }
         }
     }
@@ -444,6 +505,8 @@ class ChatViewModel @JvmOverloads constructor(
     override fun onCleared() {
         super.onCleared()
         engine.cancel()
+        voiceRecorder?.stop()
+        speechManager?.release()
         storage.close()
     }
 
@@ -468,5 +531,8 @@ class ChatViewModel @JvmOverloads constructor(
 
     companion object {
         private const val TAG = "ChatViewModel"
+        const val UI_UPDATE_INTERVAL_NS = 33_000_000L // ~30 Hz
+        const val VOICE_DEFAULT_PROMPT = "Respond to what the user said in this voice message."
+        private const val MIN_VOICE_BYTES = 3200 // 0.1 s @16kHz s16
     }
 }

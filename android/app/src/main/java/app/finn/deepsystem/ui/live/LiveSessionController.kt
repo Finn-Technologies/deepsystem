@@ -1,5 +1,9 @@
 package app.finn.deepsystem.ui.live
 
+import app.finn.deepsystem.engine.EngineProvider
+import app.finn.deepsystem.engine.FinnEngine
+import app.finn.deepsystem.engine.NativeFinnBridge
+import app.finn.deepsystem.live.RealLiveSessionController
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +37,29 @@ interface LiveSessionController {
     fun toggleMute()
     fun toggleCamera()
     fun simulateUtterance(text: String)
+    fun onCameraFrame(jpegBytes: ByteArray?) {}
+}
+
+/**
+ * Factory for creating either the real native C++ Live Session Controller or the fake controller.
+ * Provides a debug 'forceFake' toggle for simulated testing and offline previews.
+ */
+object LiveSessionFactory {
+    @Volatile
+    var forceFake: Boolean = false
+
+    fun create(
+        engineProvider: () -> FinnEngine? = { EngineProvider.getEngine() },
+        scope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob()),
+        forceFakeOverride: Boolean? = null
+    ): LiveSessionController {
+        val useFake = forceFakeOverride ?: (forceFake || EngineProvider.useFakeEngine || !NativeFinnBridge.isNativeLoaded())
+        return if (useFake) {
+            FakeLiveSessionController(scope)
+        } else {
+            RealLiveSessionController(engineProvider = engineProvider, scope = scope)
+        }
+    }
 }
 
 /**

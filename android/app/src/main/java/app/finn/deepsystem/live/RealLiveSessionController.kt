@@ -67,10 +67,9 @@ class RealLiveSessionController(
                 voice = voice
             )
             session.setAudioOutputListener { pcm, sampleRate ->
-                if (_state.value is LiveEngineState.Speaking) {
-                    audioPlayer.playChunk(pcm, sampleRate)
-                }
-                true
+                // Play whatever the core streams; barge-in (interrupt) stops the player immediately.
+                audioPlayer.playChunk(pcm, sampleRate)
+                nativeSession != null
             }
 
             nativeSession = session
@@ -139,6 +138,10 @@ class RealLiveSessionController(
 
     override fun toggleCamera() {
         _isCameraEnabled.update { !it }
+    }
+
+    override fun onCameraFrame(jpegBytes: ByteArray?) {
+        feedCameraFrame(jpegBytes)
     }
 
     fun feedCameraFrame(jpegBytes: ByteArray?) {
