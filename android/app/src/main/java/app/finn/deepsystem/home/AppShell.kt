@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.finn.deepsystem.background.NetworkLedger
 import app.finn.deepsystem.background.PrivacyLedgerScreen
 import app.finn.deepsystem.background.TaskManager
 import app.finn.deepsystem.background.TasksScreen
@@ -21,10 +22,18 @@ import app.finn.deepsystem.miniapps.MiniAppHostScreen
 import app.finn.deepsystem.miniapps.MiniAppsViewModel
 import app.finn.deepsystem.notes.NotesScreen
 import app.finn.deepsystem.notes.NotesViewModel
+import app.finn.deepsystem.sandbox.LinuxSandboxManager
+import app.finn.deepsystem.sandbox.SandboxPermissionGate
+import app.finn.deepsystem.sandbox.SandboxPermissions
+import app.finn.deepsystem.sandbox.SandboxStep
+import app.finn.deepsystem.sandbox.SandboxStepStatus
+import app.finn.deepsystem.sandbox.SandboxTerminalSheet
 import app.finn.deepsystem.ui.chat.ChatScreen
 import app.finn.deepsystem.ui.chat.ChatViewModel
 import app.finn.deepsystem.ui.live.LiveScreen
 import app.finn.deepsystem.ui.live.LiveSessionFactory
+import java.io.File
+import java.util.UUID
 
 enum class FinnTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home), Chat("Chat", Icons.Default.Chat), Notes("Notes", Icons.Default.Description)
@@ -46,12 +55,31 @@ fun AppShell(
     var showTasks by remember { mutableStateOf(false) }
     var showLive by remember { mutableStateOf(false) }
     var showPrivacyLedger by remember { mutableStateOf(false) }
+    var showSandbox by remember { mutableStateOf(false) }
+    var sandboxSteps by remember { mutableStateOf(listOf<SandboxStep>()) }
     val context = LocalContext.current
     val notes by notesVm.uiState.collectAsState()
     val mini by miniVm.state.collectAsState()
     val taskRecords by TaskManager.getInstance(context).tasks.collectAsState()
     val compact = widthSizeClass == WindowWidthSizeClass.Compact
     val liveController = remember { LiveSessionFactory.create(engineProvider = { EngineProvider.getEngine(context) }) }
+    val sandboxManager = remember { LinuxSandboxManager(context, File(context.filesDir, "sandbox")) }
+    val sandboxGate = remember { SandboxPermissionGate(NetworkLedger.getInstance(context)) }
+
+    fun runSandboxDemo() {
+        val perms = SandboxPermissions()
+        if (!sandboxGate.checkProcessSpawn(perms)) return
+        val result = sandboxManager.runCommand("echo 'Hello from Finn sandbox'", 5000L, false)
+        val step = SandboxStep(
+            id = UUID.randomUUID().toString(),
+            tool = "bash",
+            command = "echo 'Hello from Finn sandbox'",
+            stdout = result.stdout.trim(),
+            stderr = result.stderr.trim(),
+            status = if (result.exitCode == 0) SandboxStepStatus.Success else SandboxStepStatus.Failed
+        )
+        sandboxSteps = sandboxSteps + step
+    }
 
     LaunchedEffect(tab) { if (tab == FinnTab.Home) { notesVm.loadNotes(); miniVm.refresh() } }
 
@@ -93,10 +121,30 @@ fun AppShell(
                         onOpenMiniApps = { showMiniApps = true },
                         onOpenTasks = { showTasks = true },
                         onOpenLive = { showLive = true },
-                        onOpenPrivacyLedger = { showPrivacyLedger = true }
+                        onOpenPrivacyLedger = { showPrivacyLedger = true },
+                        onOpenSandbox = { runSandboxDemo(); showSandbox = true }
                     )
                     tab == FinnTab.Chat -> ChatScreen(chatViewModel, widthSizeClass = widthSizeClass, onReplayOnboarding = onReplayOnboarding)
                     else -> NotesScreen(notesVm, openNoteId = openNoteId)
+                }
+                if (showSandbox) {
+                    SandboxTerminalSheet(
+                        steps = sandboxSteps,
+                        onKill = { id -> sandboxSteps = sandboxSteps.map { if (it.id == id) it.copy(status = SandboxStepStatus.Killed) else it } },
+                        onPermissionResponse = { id, allowed ->
+                            val idx = sandboxSteps.indexOfFirst { it.id == id }
+                            if (idx >= 0) {
+                                val step = sandboxSteps[idx]
+                                val url = step.pendingPermission
+                                val perms = SandboxPermissions(networkAllowed = allowed)
+                                val granted = if (url != null) sandboxGate.requestNetwork(url, "sandbox", perms) else allowed
+                                sandboxSteps = sandboxSteps.toMutableList().apply {
+                                    this[idx] = step.copy(pendingPermission = null, status = if (granted) SandboxStepStatus.Success else SandboxStepStatus.Failed)
+                                }
+                            }
+                        },
+                        onDismiss = { showSandbox = false }
+                    )
                 }
             }
         }

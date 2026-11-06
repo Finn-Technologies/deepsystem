@@ -36,6 +36,7 @@ fun HomeScreen(
     onOpenTasks: () -> Unit,
     onOpenLive: () -> Unit = {},
     onOpenPrivacyLedger: () -> Unit = {},
+    onOpenSandbox: () -> Unit = {},
     modifier: Modifier = Modifier,
     suggestions: List<String> = DefaultSuggestions
 ) {
@@ -85,6 +86,7 @@ fun HomeScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onOpenLive, Modifier.weight(1f)) { Text("Live") }
                     OutlinedButton(onClick = onOpenPrivacyLedger, Modifier.weight(1f)) { Text("Privacy") }
+                    OutlinedButton(onClick = onOpenSandbox, Modifier.weight(1f)) { Text("Sandbox") }
                 }
             }
         }
