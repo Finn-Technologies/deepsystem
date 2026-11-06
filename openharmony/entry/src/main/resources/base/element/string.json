@@ -1,0 +1,7 @@
+{
+  "string": [
+    { "name": "app_name", "value": "Finn DeepSystem" },
+    { "name": "EntryAbility_label", "value": "Finn" },
+    { "name": "AssistantAbility_label", "value": "Finn Assistant" }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "module": {
+    "name": "entry",
+    "type": "entry",
+    "description": "Finn DeepSystem entry module",
+    "mainElement": "EntryAbility",
+    "deviceTypes": ["phone", "tablet"],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "abilities": [
+      {
+        "name": "EntryAbility",
+        "srcEntry": "./ets/entryability/EntryAbility.ets",
+        "description": "Main UI ability",
+        "icon": "$media:icon",
+        "label": "$string:EntryAbility_label",
+        "startWindowIcon": "$media:icon",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": true,
+        "skills": [
+          {
+            "entities": ["entity.system.home"],
+            "actions": ["action.system.home"]
+          }
+        ]
+      },
+      {
+        "name": "AssistantAbility",
+        "srcEntry": "./ets/entryability/AssistantAbility.ets",
+        "description": "System assistant ability (voice interaction entry)",
+        "icon": "$media:icon",
+        "label": "$string:AssistantAbility_label",
+        "startWindowIcon": "$media:icon",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": true,
+        "backgroundModes": ["audioPlayback", "audioRecording", "dataTransfer"],
+        "skills": [
+          {
+            "entities": ["entity.system.assistant"],
+            "actions": ["action.assistant.interact"]
+          }
+        ]
+      }
+    ],
+    "requestPermissions": [
+      { "name": "ohos.permission.MICROPHONE" },
+      { "name": "ohos.permission.CAMERA" },
+      { "name": "ohos.permission.KEEP_BACKGROUND_RUNNING" },
+      { "name": "ohos.permission.RUNNING_LOCK" }
+    ]
+  }
+}

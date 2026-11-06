@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Finn DeepSystem
+Comment=Fully local, privacy-first multimodal AI assistant
+Exec=finn_linux
+Icon=ai.finn.deepsystem
+Terminal=false
+Categories=Utility;AI;
+StartupNotify=true
+X-GNOME-UsesNotifications=true
