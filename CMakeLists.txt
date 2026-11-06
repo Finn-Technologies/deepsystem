@@ -42,18 +42,24 @@ add_library(finn_core STATIC
     core/src/llama_engine.cpp
     core/src/live_session.cpp
     core/src/finn_c.cpp
+    core/src/agent_tools.cpp
+    core/src/finn_c_api.cpp
 )
 
 target_include_directories(finn_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/core/include>
         $<INSTALL_INTERFACE:include>
     PRIVATE
         third_party/llama.cpp/include
         third_party/llama.cpp/ggml/include
         third_party/llama.cpp/tools/mtmd
+        third_party/llama.cpp/vendor
         third_party/sqlite
 )
+# nlohmann json is needed by agent tools public-ish headers
+target_include_directories(finn_core PUBLIC third_party/llama.cpp/vendor)
 
 target_link_libraries(finn_core
     PUBLIC
@@ -89,12 +95,13 @@ if (BUILD_TESTING)
         core/tests/test_c_abi.cpp
         core/tests/test_thinking_filter.cpp
         core/tests/test_live_session.cpp
+        core/tests/test_agent_tools.cpp
     )
     target_link_libraries(core_tests
         PRIVATE
             finn_core
             GTest::gtest_main
     )
-    target_include_directories(core_tests PRIVATE include)
+    target_include_directories(core_tests PRIVATE include core/include)
     add_test(NAME core_tests COMMAND core_tests)
 endif()
